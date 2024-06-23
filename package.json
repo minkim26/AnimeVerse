@@ -1,0 +1,21 @@
+{
+  "name": "anime_verse",
+  "version": "1.0.0",
+  "description": "Anime Recommendation App",
+  "scripts": {
+    "start": "serve -p 3001 app",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run --config video=true",
+    "test": "start-server-and-test start http://localhost:3001 cy:run"
+  },
+  "dependencies": {
+    "serve": "^14.2.3",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "@testing-library/cypress": "^10.0.2",
+    "cross-env": "^7.0.3",
+    "cypress": "^13.10.0",
+    "start-server-and-test": "^2.0.3"
+  }
+}

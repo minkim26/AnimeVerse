@@ -1,0 +1,28 @@
+{
+  "name": "anime-verse-backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "serve -p 3001 app"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.2",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.3.4",
+    "serve": "^14.2.3"
+  },
+  "devDependencies": {
+    "@testing-library/cypress": "^10.0.2",
+    "cross-env": "^7.0.3",
+    "cypress": "^13.10.0",
+    "start-server-and-test": "^2.0.3"
+  }
+}

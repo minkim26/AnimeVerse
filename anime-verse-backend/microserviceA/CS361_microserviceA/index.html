@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microservice A</title>
+    <script>
+        async function createAccount() {
+            try {
+                const response = await fetch('http://localhost:5000/random-profile-image');
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                const data = await response.json();
+                const profileImage = document.getElementById('profile-picture');
+                profileImage.src = data.image_url;
+                profileImage.alt = "Profile Picture";
+            } catch (error) {
+                console.error('Failed to fetch random profile image:', error);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Press the button to generate a random profile</h1>
+    <img id="profile-picture" src="" alt="Profile Picture" width="150" height="150">
+    <br>
+    <button onclick="createAccount()">Create Account</button>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - AnimeVerse</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="preferences.html">Preferences</a></li>
+        <li><a href="profile.html">Profile</a></li>
+        <li><a href="#" id="logout-btn">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Profile</h1>
+    <section id="profile-info">
+      
+      <section id="profile-picture-section">
+        <h3>Profile Picture</h3>
+        <img id="profile-picture" src="" alt="Profile Picture" width="150" height="150">
+        <br>
+        <button id="random-profile-picture-btn">Random Profile Picture</button>
+      </section>
+    </section>
+      
+      <h2>Update your profile information below:</h2>
+      <form id="password-form">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required>
+
+        <label for="old-password">Old Password:</label>
+        <input type="password" id="old-password" name="old-password" required>
+
+        <label for="new-password">New Password:</label>
+        <input type="password" id="new-password" name="new-password" required>
+
+        <label for="confirm-password">Confirm New Password:</label>
+        <input type="password" id="confirm-password" name="confirm-password" required>
+
+        <button type="submit">Update Password</button>
+      </form>
+
+    <section id="anime-title-section">
+      <h3>Random Anime Title Generator w/ Number of Episodes</h3>
+      <p id="anime-title-text">Fetching title...</p>
+      <br>
+      <button id="random-anime-title-btn">Random Anime Title</button>
+    </section>
+
+    <section id="anime-quote-section">
+      <h3>Random Anime Quote Generator</h3>
+      <p id="anime-quote">Fetching quote...</p>
+    </section>
+
+    <section id="anime-picture-section">
+      <h3>Random Anime Picture Generator</h3>
+      <p>(Click on the image to see the description and title.)</p>
+      <img id="anime-picture" src="" alt="Anime Picture" width="300" height="450" style="cursor: pointer;">
+      <p id="anime-description" style="display:none;">Fetching description...</p>
+      <p id="anime-title" style="display:none;"></p>
+      <br>
+      <button id="random-anime-picture-btn">Random Anime Picture</button>
+    </section>
+
+    <section id="preferences-info">
+      <h2>Current Preferences</h2>
+      <ul id="preferences-list"></ul>
+      <a href="preferences.html">Update Preferences</a>
+    </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2024 AnimeVerse. All rights reserved.</p>
+    <p><a href="privacy-policy.html" style="color: #3d8eba;">Privacy Policy</a></p>
+  </footer>
+
+  <script src="profile.js"></script>
+</body>
+</html>

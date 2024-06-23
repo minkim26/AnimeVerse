@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preferences - AnimeVerse</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="recommendations.html">Recommendations</a></li>
+        <li><a href="profile.html">Profile</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Update Your Preferences</h1>
+    <p>Select the genres you enjoy to better configure your reccomendation settings:</p>
+    <form id="preferencesForm">
+      <div class="checkbox">
+        <input type="checkbox" id="action" name="genres" value="action">
+        <label for="action">Action</label>
+      </div>
+      <div class="checkbox">
+        <input type="checkbox" id="comedy" name="genres" value="comedy">
+        <label for="comedy">Comedy</label>
+      </div>
+      <div class="checkbox">
+        <input type="checkbox" id="fantasy" name="genres" value="fantasy">
+        <label for="fantasy">Fantasy</label>
+      </div>
+      <div class="checkbox">
+        <input type="checkbox" id="horror" name="genres" value="horror">
+        <label for="horror">Horror</label>
+      </div>
+      <div class="checkbox">
+        <input type="checkbox" id="mystery" name="genres" value="mystery">
+        <label for="mystery">Mystery</label>
+      </div>
+      <div class="checkbox">
+        <input type="checkbox" id="romance" name="genres" value="romance">
+        <label for="romance">Romance</label>
+      </div>
+      <div class="checkbox">
+        <input type="checkbox" id="thriller" name="genres" value="thriller">
+        <label for="thriller">Thriller</label>
+      </div>
+
+      <p>**Updating your preferences will change the recommendations you receive.**</p>
+      <p>**The more preferences you select, it will broaden the reccomendations.**</p>
+      <button type="submit">Update Preferences</button>
+    </form>
+  </main>
+
+  <footer>
+    <p>&copy; 2024 AnimeVerse. All rights reserved.</p>
+    <p><a href="privacy-policy.html" style="color: #3d8eba;">Privacy Policy</a></p>
+  </footer>
+
+  <script src="preferences.js"></script>
+</body>
+</html>

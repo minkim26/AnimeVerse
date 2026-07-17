@@ -4,56 +4,60 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AnimeVerse is an anime recommendation web app: a static multi-page HTML/CSS/vanilla-JS frontend backed by one Node/Express auth API and three independent Flask microservices. There is no build step or bundler — pages are plain `.html` files that each load a matching `.js` file directly via `<script>` tags.
+AnimeVerse is an anime recommendation web app: a React 19 + Vite + TypeScript SPA backed by a single Express + Prisma + Postgres API, orchestrated with Docker Compose. Supabase is used exclusively for Storage (avatar images) — not for auth or as the primary database. There is no separate Node/Flask microservice tier anymore; everything the old five-service split used to do now lives in one Express app.
+
+> This describes the current (rewritten) architecture. The prior static-site + Node + 4-Flask-microservice architecture is preserved under the `legacy-static-site` git tag and archived at `docs/legacy-static-site-readme.md`.
 
 ## Architecture
 
-**Frontend** (repo root): Static pages, one per feature — `index.html`/`app.js` (landing + auth-gate logic), `login.html`/`login.js`, `signup.html`/`signup.js`, `preferences.html`/`preferences.js`, `profile.html`/`profile.js`, `recommendations.html`/`recommendations.js`. Auth state lives in `localStorage` (`token` key); `app.js` redirects unauthenticated users away from `preferences.html`, `recommendations.html`, and `profile.html`. `recommendations.js` calls the public Kitsu API (`https://kitsu.io/api/edge/...`) directly from the browser — it does not go through the Node backend.
+**Frontend** (repo root, `src/`): React SPA built with Vite. Routes live in `src/App.tsx` — `/`, `/login`, `/signup`, `/privacy-policy` are public; `/preferences`, `/recommendations`, `/profile` are wrapped in `ProtectedRoute` (redirects to `/login` if no JWT in `localStorage`). `src/services/` holds one thin fetch wrapper per backend resource (`api.ts` is the shared base — reads `VITE_API_URL`, attaches `Authorization: Bearer <token>`); `src/services/kitsu.ts` calls the public Kitsu API directly from the browser, bypassing the backend entirely (recommendations, trending, new releases, random anime).
 
-**Backend** (`anime-verse-backend/`): Four separate services, each hardcoded to a specific `localhost` port and started independently (no orchestration script ties them together):
-- `server.js` (Express, port **3000**) — auth and user data: `/api/login`, `/api/signup`, `/api/updatePassword`, `/api/updateUsername`, `/api/preferences/:email`, `/api/watchlist/:email`, `/api/reviews/:email`. All state is in-memory JS arrays/objects (`users`, `userPreferences`, `userWatchlists`, `userReviews`) — nothing persists across restarts, and Mongoose is a listed dependency but not yet wired to a real MongoDB connection.
-- `microserviceA/CS361_microserviceA/microservice.py` (Flask, port **5000**) — `/random-profile-image`, `/images/<filename>`. Reads the image directory from its local `config.txt`, so it must be run with that directory as CWD. Has its own `README.md`, `requirements.txt`, and `images/`.
-- `animeQuoteService.py` (Flask, port **5001**) — `/random-anime-quote`, serves a hardcoded in-file quote list.
-- `animePictureService.py` (Flask, port **5002**) — `/random-anime`. Despite the filename, this does *not* serve profile pictures; it fetches random anime (title/image/synopsis) from the public Kitsu API.
-- `animeTitleService.py` (Flask, port **5003**) — `/random-anime-title`, serves a hardcoded in-file anime/episode-count list.
+**Backend** (`anime-verse-backend/`): Single Express 5 + TypeScript API on port **8000**. Routers live in `api/*.ts` and are aggregated in `api/index.ts`, mounted at `/`:
+- `api/users.ts` — `POST /users` (signup), `POST /users/login`, `GET /users/me`, `PATCH /users/me/password`
+- `api/preferences.ts` — `GET /preferences/me`, `PUT /preferences/me` (full-replace upsert)
+- `api/watchlist.ts`, `api/reviews.ts` — CRUD, `requireAuth` + ownership via JWT `sub` claim (provisioned; no frontend page consumes these yet)
+- `api/quotes.ts`, `api/titles.ts` — `GET /quotes/random`, `GET /titles/random`, served from Postgres (seeded from `data/quotes.json` / `data/titles.json`)
+- `api/avatar.ts` — `POST /avatar`, multer + Supabase Storage upload + RabbitMQ publish
 
-Frontend JS files call these services by absolute `http://localhost:<port>` URLs (see `profile.js`, `login.js`, `signup.js`), so all relevant backend services must be running locally on their expected ports for a given page to work fully.
+Auth is self-issued JWTs (`lib/auth.ts`: `generateToken`/`verifyToken`/`requireAuth` middleware, `bcryptjs` for password hashing) — no third-party auth provider. Data access is Prisma (`lib/prisma.ts`, `PrismaPg` adapter reading `POSTGRES_URL`) against Postgres. Request bodies are validated with Zod schemas in `lib/zod.ts`; `server.ts`'s centralized error handler turns `ZodError` into 400s and Prisma `P2003`/`P2025` into 400/404.
+
+**Avatar upload pipeline** (async, the most complex feature in the app): `POST /avatar` uploads the original to the `avatars` Supabase Storage bucket, saves `avatarUrl` on the `User` row immediately, and publishes a message to the `avatar-thumbnails` RabbitMQ queue. A separate `consumer.ts` process (started as its own Docker Compose service) consumes that queue, downloads the original, resizes it to 128x128 via `sharp`, uploads the result to the `avatar-thumbnails` bucket, and writes `avatarThumbnailUrl` back via Prisma. See `docs/avatar-upload-pipeline.md` for the full request lifecycle.
+
+**Data model** (`prisma/schema.prisma`): `User` (email, bcrypt `password`, `avatarUrl`, `avatarThumbnailUrl`), `Preference` (1:1 with User, `genres: String[]`), `WatchlistItem` and `Review` (both unique on `(userId, animeId)`), `Quote` and `Title` (static seed content, no user association).
+
+**Orchestration** (`anime-verse-backend/compose.yml`): `api`, `consumer`, `postgres` (health-checked), `rabbitmq` (health-checked), `initdb` (runs `prisma migrate deploy` + the seed script once, then exits). `api` and `consumer` both depend on `postgres`, `rabbitmq`, and `initdb` completing successfully.
 
 ### Known quirks worth checking before assuming behavior
 
-- File names don't match their function: `animePictureService.py` returns random anime info (not a picture), and the actual profile-picture service lives under `microserviceA/CS361_microserviceA/microservice.py`. Verify the `@app.route` and `app.run(port=...)` lines directly rather than trusting a filename.
-- `server.js` uses a hardcoded JWT secret (`'your-secret-key'`) and in-memory storage — this is a prototype auth layer, not production-ready.
-- The root `package.json` and `anime-verse-backend/package.json` both define `cy:open`/`cy:run`/`test` scripts referencing Cypress, but no `cypress/` directory or config currently exists in the repo.
+- Kitsu calls happen entirely client-side (`src/services/kitsu.ts`) — the Express API has no route that proxies or caches Kitsu data. Don't look for a backend endpoint for recommendations; there isn't one.
+- Watchlist and Reviews are fully implemented on the backend (models, Zod schemas, REST routes, ownership checks) but have zero frontend consumers — this is a deliberate scope decision from the modernization rewrite, not a bug or an oversight.
+- `SUPABASE_KEY` must be the Supabase **service_role** key and is server-side only (`lib/supabase.ts`); it must never be sent to or read by the frontend.
+- The avatar upload response returns `avatarUrl` immediately but `avatarThumbnailUrl` is only populated after the RabbitMQ consumer finishes processing — the frontend (`Profile.tsx`) shows a "Generating thumbnail..." state in the gap. Don't assume both URLs are present right after upload.
+- No production deployment target is configured yet. `.github/workflows/static.yml` still targets GitHub Pages from the old static-site era and cannot host this stack (it needs a running Postgres + RabbitMQ + Express process, not just static files).
 
 ## Common Commands
 
 Frontend (repo root):
 ```bash
 npm install
-npm start        # serves the static frontend on http://localhost:3001
+npm run dev       # Vite dev server, http://localhost:5173
+npm run build     # tsc -b && vite build
+npm run lint      # eslint .
 ```
 
-Backend — Node auth API:
+Backend — full stack via Docker Compose (recommended):
+```bash
+cd anime-verse-backend
+docker compose up   # postgres, rabbitmq, api (:8000), consumer, initdb (migrate+seed, runs once)
+```
+
+Backend — local dev without Docker:
 ```bash
 cd anime-verse-backend
 npm install
-node server.js    # runs on http://localhost:3000
+npm run initdb     # prisma migrate deploy && prisma generate, then seeds Quote/Title
+npm run dev        # tsx watch server.ts, http://localhost:8000
+npx tsx consumer.ts  # run separately to process avatar-thumbnail jobs; needs a local RabbitMQ
 ```
 
-Backend — Flask microservices (each run separately, typically in their own terminal/venv):
-```bash
-cd anime-verse-backend
-pip install flask flask-cors requests
-python3 animeQuoteService.py     # port 5001
-python3 animePictureService.py   # port 5002 (random anime via Kitsu, despite the name)
-python3 animeTitleService.py     # port 5003
-```
-
-The profile-image microservice has its own requirements.txt and must be run from its own directory (it reads `config.txt` relative to CWD):
-```bash
-cd anime-verse-backend/microserviceA/CS361_microserviceA
-pip install -r requirements.txt
-python3 microservice.py          # port 5000
-```
-
-To exercise a full page (e.g. `profile.html`), the Node server and whichever Flask services that page calls must all be running concurrently on their expected ports.
+To exercise the full app (especially the profile page's avatar upload), the API, Postgres, RabbitMQ, and the consumer must all be running — `docker compose up` is the simplest way to get all four at once.

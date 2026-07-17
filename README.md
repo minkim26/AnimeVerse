@@ -1,177 +1,198 @@
 # AnimeVerse
 
-AnimeVerse is an anime recommendation web app. Users sign up, pick genre preferences, and get personalized, trending, new-release, and random anime recommendations pulled from the [Kitsu API](https://kitsu.io/api/edge/anime). A profile page lets users manage their account and play with a handful of anime-themed microservices (random profile picture, random anime, random title, random quote).
+AnimeVerse is an anime recommendation web app. Users sign up, pick genre preferences, and get personalized, trending, new-release, and random anime recommendations pulled from the [Kitsu API](https://kitsu.io/api/edge/anime). A profile page lets users manage their account, upload a real profile picture, and play with random anime quote/title/picture generators.
 
-The app is split into a static frontend and four independently run backend services. There is no build step for the frontend and no single command that starts everything — each piece is started on its own port, as described below.
+The app is a React SPA backed by a single Express + Prisma + Postgres API, orchestrated with Docker Compose. Supabase is used exclusively for file storage (avatar images); it is not used for auth or as the primary database.
 
-> Looking for the old profile-image microservice README that used to live here? It's archived at [docs/microservice-a-profile-image.md](docs/microservice-a-profile-image.md).
+> Looking for the old static-site version of this project (vanilla JS frontend + Node auth API + four Flask microservices)? It's archived at [docs/legacy-static-site-readme.md](docs/legacy-static-site-readme.md) and preserved under the `legacy-static-site` git tag.
 
 ## Features
 
-- **Signup / Login** — email + password auth against the Node backend, JWT stored in `localStorage`.
-- **Preferences** — pick favorite genres (action, comedy, fantasy, horror, mystery, romance, thriller), saved to `localStorage`.
-- **Recommendations** — genre-matched picks, trending-now, new releases, and a random selection, all fetched live from Kitsu.
-- **Profile** — change password, view saved preferences, and fetch a random profile picture, random anime, random anime title, and random anime quote from the local microservices.
-- **Auth gating** — `preferences.html`, `recommendations.html`, and `profile.html` redirect to `login.html` if no token is present (see `app.js`).
+- **Signup / Login** — email + password auth against the API, JWT stored in `localStorage`.
+- **Preferences** — pick favorite genres (action, comedy, fantasy, horror, mystery, romance, thriller), persisted per-user in Postgres.
+- **Recommendations** — genre-matched picks, trending-now, new releases, and a random selection, fetched directly from Kitsu in the browser.
+- **Profile** — change password, upload a real profile picture (async thumbnail generation), view saved preferences, and fetch a random anime, anime title, and anime quote.
+- **Auth gating** — `/preferences`, `/recommendations`, and `/profile` redirect to `/login` if no token is present (see `src/components/ProtectedRoute.tsx`).
+
+## Tech Stack
+
+| Layer | Stack |
+|---|---|
+| Frontend | React 19 + Vite 7 + TypeScript, Tailwind CSS v4, react-router-dom v7 |
+| Backend | Express 5 + TypeScript, Prisma 7 (Postgres), Zod 4 validation |
+| Auth | Self-issued JWTs (`jsonwebtoken` + `bcryptjs`) — no third-party auth provider |
+| File storage | Supabase Storage (avatar originals + generated thumbnails) |
+| Async processing | RabbitMQ + a standalone `consumer.ts` worker using `sharp` for thumbnailing |
+| Orchestration | Docker Compose (`api`, `consumer`, `postgres`, `rabbitmq`, `initdb`) |
 
 ## Architecture
 
 ```
-Browser (static HTML/CSS/vanilla JS, served on :3001)
+Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
   |
-  |-- calls -----------------------------> Kitsu public API (recommendations.js)
+  |-- calls directly ------------------> Kitsu public API (src/services/kitsu.ts)
   |
-  |-- calls -----------------------------> Node/Express auth API      (server.js,              :3000)
-  |-- calls -----------------------------> Flask: profile image       (microservice.py,         :5000)
-  |-- calls -----------------------------> Flask: anime quote         (animeQuoteService.py,    :5001)
-  |-- calls -----------------------------> Flask: random anime        (animePictureService.py,  :5002)
-  |-- calls -----------------------------> Flask: anime title         (animeTitleService.py,    :5003)
+  |-- calls ------------------> Express API (:8000)
+                                   |
+                                   |-- Prisma ------> Postgres (users, preferences,
+                                   |                   watchlist, reviews, quotes, titles)
+                                   |
+                                   |-- avatar upload -> Supabase Storage (avatars bucket)
+                                   |                     + publishes a message to RabbitMQ
+                                   |
+                                   |                   RabbitMQ (avatar-thumbnails queue)
+                                   |                     |
+                                   |                     v
+                                   |                   consumer.ts worker
+                                   |                     -- downloads original from Supabase
+                                   |                     -- resizes to 128x128 via sharp
+                                   |                     -- uploads thumbnail to Supabase Storage
+                                   |                     -- writes avatarThumbnailUrl via Prisma
 ```
 
-Every service is hardcoded to `http://localhost:<port>` on both the frontend (see `login.js`, `signup.js`, `profile.js`) and backend side, so all of them need to be running locally, on their expected ports, for a page to work fully. There's no reverse proxy or gateway in front of them.
+Recommendations and the profile page's random-anime feature call Kitsu directly from the browser — there is no backend proxy for that traffic, same as before the rewrite.
 
-One naming quirk to be aware of: `animePictureService.py` does **not** serve profile pictures — despite the name, it returns a random anime (title/image/synopsis) fetched from Kitsu, on port 5002. The actual profile-picture service is `anime-verse-backend/microserviceA/CS361_microserviceA/microservice.py`, on port 5000.
-
-The Node auth API (`server.js`) keeps all user data (accounts, preferences, watchlists, reviews) in in-memory JS objects — nothing persists across a server restart, and `mongoose` is a listed dependency but not yet wired to a database.
+See [docs/architecture.md](docs/architecture.md) for a deeper breakdown of each service and [docs/avatar-upload-pipeline.md](docs/avatar-upload-pipeline.md) for the full avatar upload request lifecycle.
 
 ## Prerequisites
 
 - Node.js and npm
-- Python 3.x and pip
+- Docker and Docker Compose (recommended path — runs Postgres, RabbitMQ, and the API together)
+- A Supabase project with two public Storage buckets (`avatars`, `avatar-thumbnails`) — see [docs/supabase-setup.md](docs/supabase-setup.md) if you need to create one
 
 ## Setup and Running
 
-Each block below runs in its own terminal (or its own tab/pane), since every service blocks its terminal while running.
-
-### 1. Frontend
+### 1. Backend — Docker Compose (recommended)
 
 ```bash
-npm install
-npm start        # serves the static site at http://localhost:3001
+cd anime-verse-backend
+cp .env.example .env.production   # fill in JWT_SECRET, SUPABASE_URL, SUPABASE_KEY
+docker compose up
 ```
 
-### 2. Auth API (Node/Express)
+This starts Postgres, RabbitMQ, the API (`:8000`), and the thumbnail consumer, and runs migrations + seeds the `Quote`/`Title` tables on first boot via the `initdb` service.
+
+### 2. Backend — local dev without Docker
 
 ```bash
 cd anime-verse-backend
 npm install
-node server.js    # http://localhost:3000
+cp .env.example .env.local        # point POSTGRES_URL at a local or Supabase-hosted Postgres
+npm run initdb                    # runs migrations + seeds Quote/Title tables
+npm run dev                       # tsx watch, http://localhost:8000
 ```
 
-### 3. Anime quote service (Flask)
+To exercise the avatar upload pipeline outside Docker you also need a local RabbitMQ instance and to run the consumer separately:
 
 ```bash
-cd anime-verse-backend
-pip install flask flask-cors
-python3 animeQuoteService.py    # http://localhost:5001
+npx tsx consumer.ts
 ```
 
-### 4. Random anime service (Flask, calls Kitsu)
+### 3. Frontend
 
 ```bash
-cd anime-verse-backend
-pip install flask flask-cors requests
-python3 animePictureService.py  # http://localhost:5002
+npm install
+cp .env.example .env              # VITE_API_URL, defaults to http://localhost:8000
+npm run dev                       # http://localhost:5173
 ```
 
-### 5. Anime title service (Flask)
+## Environment Variables
 
-```bash
-cd anime-verse-backend
-pip install flask flask-cors
-python3 animeTitleService.py    # http://localhost:5003
-```
+### `anime-verse-backend/.env.local` / `.env.production`
 
-### 6. Profile image microservice (Flask)
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_URL` | Prisma connection string. `postgres` as host inside Docker Compose, `localhost` outside it. |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Used by the official `postgres` image to initialize the database (Docker Compose only). |
+| `JWT_SECRET` | Signs/verifies auth JWTs. Use a long random value outside local dev. |
+| `PORT` | API listen port (defaults to `8000`). |
+| `SUPABASE_URL` | The AnimeVerse Supabase project's API URL. |
+| `SUPABASE_KEY` | Supabase **service_role** key — server-side only, never shipped to the frontend. |
+| `RABBITMQ_URL` | RabbitMQ connection string. `rabbitmq` as host inside Docker Compose, `localhost` outside it. |
 
-This one lives in its own subfolder with its own `requirements.txt`, and it reads `config.txt` relative to its working directory, so run it from inside that folder:
+### root `.env` (Vite, safe to expose client-side)
 
-```bash
-cd anime-verse-backend/microserviceA/CS361_microserviceA
-pip install -r requirements.txt
-python3 microservice.py         # http://localhost:5000
-```
+| Variable | Purpose |
+|---|---|
+| `VITE_API_URL` | Base URL of the Express API (defaults to `http://localhost:8000`). |
 
-Update `config.txt` (`image_directory=images`) or drop your own images into the `images/` folder to change what gets served.
+## Available Scripts
 
-### Running everything together
+### Frontend (repo root)
 
-To use every feature (especially the profile page), start all six of the above in parallel: the frontend, the Node auth API, and the four Flask services. The homepage and recommendations page only need the frontend, since recommendations are fetched directly from Kitsu.
+| Script | Purpose |
+|---|---|
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Type-check (`tsc -b`) and produce a production build |
+| `npm run lint` | Run ESLint |
+| `npm run preview` | Preview the production build locally |
+
+### Backend (`anime-verse-backend/`)
+
+| Script | Purpose |
+|---|---|
+| `npm run dev` | `tsx watch server.ts` — restarts on file change |
+| `npm start` | Run the API once (used by the Docker image) |
+| `npm run initdb` | Run Prisma migrations, then seed `Quote`/`Title` from `data/*.json` |
+| `npm run build` | Type-check only (`tsc --noEmit`) |
 
 ## API Reference
 
-### Auth API — `http://localhost:3000` (`server.js`)
+Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorization: Bearer <token>` header.
 
-| Method | Path | Body | Notes |
-|---|---|---|---|
-| POST | `/api/login` | `{ email, password }` | Returns `{ success, token }` |
-| POST | `/api/signup` | `{ email, password }` | Returns `{ success, message }` |
-| POST | `/api/updatePassword` | `{ email, oldPassword, newPassword }` | |
-| POST | `/api/updateUsername` | `{ email, newUsername }` | |
-| GET | `/api/preferences/:email` | — | |
-| POST | `/api/preferences` | `{ email, preferences }` | |
-| GET | `/api/watchlist/:email` | — | |
-| POST | `/api/watchlist` | `{ email, watchlist }` | |
-| GET | `/api/reviews/:email` | — | |
-| POST | `/api/reviews` | `{ email, animeId, review }` | |
-
-### Profile image — `http://localhost:5000`
-
-| Method | Path | Response |
-|---|---|---|
-| GET | `/random-profile-image` | `{ image_url }` |
-| GET | `/images/<filename>` | Serves the image file |
-
-### Anime quote — `http://localhost:5001`
-
-| Method | Path | Response |
-|---|---|---|
-| GET | `/random-anime-quote` | `{ quote, character, anime }` |
-
-### Random anime (Kitsu-backed) — `http://localhost:5002`
-
-| Method | Path | Response |
-|---|---|---|
-| GET | `/random-anime` | `{ title, image_url, description }` |
-
-### Anime title — `http://localhost:5003`
-
-| Method | Path | Response |
-|---|---|---|
-| GET | `/random-anime-title` | `{ title, episodes }` |
+| Method | Path | Auth | Body | Notes |
+|---|---|---|---|---|
+| POST | `/users` | | `{ email, password }` | Signup |
+| POST | `/users/login` | | `{ email, password }` | Returns `{ token }` |
+| GET | `/users/me` | ✓ | — | Current user (password field stripped) |
+| PATCH | `/users/me/password` | ✓ | `{ oldPassword, newPassword }` | Re-verifies `oldPassword` via bcrypt before updating |
+| GET | `/preferences/me` | ✓ | — | Returns `{ genres: [] }` if none saved |
+| PUT | `/preferences/me` | ✓ | `{ genres: string[] }` | Full-replace upsert |
+| GET | `/watchlist` | ✓ | — | Provisioned — no frontend page consumes this yet |
+| POST | `/watchlist` | ✓ | `{ animeId, title?, posterUrl? }` | Upsert on `(userId, animeId)` |
+| DELETE | `/watchlist/:animeId` | ✓ | — | |
+| GET | `/reviews` | ✓ | — | Provisioned — no frontend page consumes this yet |
+| POST | `/reviews` | ✓ | `{ animeId, rating, reviewText }` | Upsert on `(userId, animeId)` |
+| DELETE | `/reviews/:animeId` | ✓ | — | |
+| GET | `/quotes/random` | | — | `{ quote, character, anime }` |
+| GET | `/titles/random` | | — | `{ title, episodes }` |
+| POST | `/avatar` | ✓ | `multipart/form-data`, field `file` | Uploads original to Supabase, publishes a thumbnail job, returns `{ avatarUrl }` |
+| GET | `/health` | | — | `{ status: 'ok' }` |
 
 ## Project Structure
 
 ```
 .
-├── index.html / login.html / signup.html      # entry pages
-├── preferences.html / recommendations.html    # genre selection + recommendations
-├── profile.html                               # account + microservice playground
-├── privacy-policy.html
-├── app.js                                     # shared auth-gate/logout logic
-├── login.js / signup.js / preferences.js      # per-page logic
-├── recommendations.js                         # Kitsu-backed recommendations
-├── profile.js                                 # calls the Node API + all 4 microservices
-├── styles.css
+├── src/                                  # React frontend
+│   ├── pages/                            # Home, Login, Signup, Preferences,
+│   │                                      # Recommendations, Profile, PrivacyPolicy, NotFound
+│   ├── components/                       # Navbar, Footer, ProtectedRoute, AnimeCard, GenreCheckboxGroup
+│   ├── services/                         # api.ts (fetch wrapper), auth, preferences, kitsu,
+│   │                                      # quotes, titles, avatar — one thin client per resource
+│   └── data/genres.ts
 ├── docs/
-│   └── microservice-a-profile-image.md        # archived original README
+│   ├── architecture.md
+│   ├── supabase-setup.md
+│   ├── avatar-upload-pipeline.md
+│   ├── legacy-static-site-readme.md      # archived pre-rewrite README
+│   └── microservice-a-profile-image.md   # archived original microservice README
 └── anime-verse-backend/
-    ├── server.js                              # Express auth API (:3000)
-    ├── animeQuoteService.py                   # Flask (:5001)
-    ├── animePictureService.py                 # Flask (:5002) — random anime, not a picture
-    ├── animeTitleService.py                   # Flask (:5003)
-    └── microserviceA/CS361_microserviceA/
-        ├── microservice.py                    # Flask (:5000) — actual profile-image service
-        ├── config.txt
-        └── images/
+    ├── api/                              # users, preferences, watchlist, reviews, quotes, titles, avatar
+    ├── lib/                              # prisma.ts, auth.ts, zod.ts, supabase.ts
+    ├── prisma/                           # schema.prisma, migrations, seed.ts
+    ├── data/                             # quotes.json, titles.json (seed source)
+    ├── server.ts                         # Express app + error handler
+    ├── consumer.ts                       # RabbitMQ worker — avatar thumbnailing
+    ├── compose.yml
+    └── Dockerfile
 ```
 
 ## Known Limitations
 
-- The auth API stores all data in memory; restarting `server.js` wipes every account, preference, watchlist, and review.
-- The JWT signing secret in `server.js` is a hardcoded placeholder (`'your-secret-key'`), not something pulled from the environment.
-- Both `package.json` files define Cypress scripts (`cy:open`, `cy:run`, `test`), but no `cypress/` config or test files currently exist in the repo.
+- Watchlist and Reviews have full Prisma models and REST endpoints but no frontend UI yet — nothing in the app currently calls them.
+- No production deployment target is configured. `.github/workflows/static.yml` still deploys to GitHub Pages, which can only serve the static frontend build — it cannot run the Express API, Postgres, or RabbitMQ. A real host (Railway, Render, Fly.io, or a VPS running Docker Compose) is needed before this app can be used outside local dev.
+- The frontend has been verified via TypeScript compilation, ESLint, and production builds, but has not yet been click-tested in a browser.
 
 ## Deployment
 
-`.github/workflows/static.yml` deploys the repository as-is to GitHub Pages on every push to `main`. Since GitHub Pages only serves static files, the deployed site will not have the Node or Flask backends available — those must be run locally (or hosted separately) for the backend-dependent features to work.
+Not yet configured for the new stack — see **Known Limitations** above. The existing `.github/workflows/static.yml` predates this rewrite and needs to be replaced (or removed) once a real hosting target is chosen.

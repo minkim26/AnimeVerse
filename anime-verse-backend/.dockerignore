@@ -1,0 +1,5 @@
+.git
+.env.local
+.env.production
+node_modules
+generated

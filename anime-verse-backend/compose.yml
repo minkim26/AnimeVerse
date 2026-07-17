@@ -1,0 +1,56 @@
+services:
+  api:
+    build: .
+    env_file: .env.production
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+      rabbitmq:
+        condition: service_healthy
+        restart: true
+      initdb:
+        condition: service_completed_successfully
+
+  consumer:
+    build: .
+    env_file: .env.production
+    command: [ "sh", "-c", "npm run prestart && npx tsx consumer.ts" ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+      rabbitmq:
+        condition: service_healthy
+        restart: true
+      initdb:
+        condition: service_completed_successfully
+
+  postgres:
+    image: postgres
+    env_file: .env.production
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:4
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  initdb:
+    build: .
+    env_file: .env.production
+    command: [ "npm", "run", "initdb" ]
+    depends_on:
+      postgres:
+        condition: service_healthy

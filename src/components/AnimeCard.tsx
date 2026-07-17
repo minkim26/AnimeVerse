@@ -1,0 +1,28 @@
+import { useState } from 'react'
+import { animeTitle, type KitsuAnime } from '../services/kitsu.ts'
+
+interface AnimeCardProps {
+  anime: KitsuAnime
+}
+
+export default function AnimeCard({ anime }: AnimeCardProps) {
+  const [showSynopsis, setShowSynopsis] = useState(false)
+  const title = animeTitle(anime)
+  const poster = anime.attributes.posterImage?.small
+
+  return (
+    <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm hover:-translate-y-1 transition-transform">
+      <button
+        type="button"
+        onClick={() => setShowSynopsis((v) => !v)}
+        className="block w-full text-left bg-transparent border-none p-0 cursor-pointer"
+      >
+        <h3 className="font-display text-sm font-semibold mb-2">{title}</h3>
+        {poster && <img src={poster} alt={title} className="w-full rounded-xl object-cover" />}
+      </button>
+      {showSynopsis && (
+        <p className="text-xs text-[var(--color-muted)] mt-2 line-clamp-6">{anime.attributes.synopsis}</p>
+      )}
+    </div>
+  )
+}

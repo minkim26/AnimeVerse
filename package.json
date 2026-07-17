@@ -1,21 +1,39 @@
 {
-  "name": "anime_verse",
+  "name": "animeverse",
+  "private": true,
   "version": "1.0.0",
-  "description": "Anime Recommendation App",
+  "type": "module",
+  "description": "AnimeVerse — anime recommendation web app",
   "scripts": {
-    "start": "serve -p 3001 app",
-    "cy:open": "cypress open",
-    "cy:run": "cypress run --config video=true",
-    "test": "start-server-and-test start http://localhost:3001 cy:run"
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "serve": "^14.2.3",
-    "cors": "^2.8.5"
+    "@fontsource/inter": "^5.2.5",
+    "@fontsource/poppins": "^5.2.5",
+    "lucide-react": "^0.577.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.13.1"
   },
   "devDependencies": {
-    "@testing-library/cypress": "^10.0.2",
-    "cross-env": "^7.0.3",
-    "cypress": "^13.10.0",
-    "start-server-and-test": "^2.0.3"
+    "@eslint/js": "^9.39.1",
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vite": "^7.2.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
   }
 }

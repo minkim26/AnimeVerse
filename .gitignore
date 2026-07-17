@@ -1,26 +1,27 @@
 # Dependencies
 node_modules/
 
+# Reference-only material (not part of this project)
+/assignment-3-minkim26/
+/assignment-4-minkim26/
+/final-project-bookmarked/
+
 # Environment variables
 .env
 .env.local
+.env.production
+.env.testing
 
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
-venv/
-.venv/
-env/
+# Prisma generated client
+anime-verse-backend/generated/
+
+# Build output
+dist/
+*.tsbuildinfo
 
 # Logs
 npm-debug.log*
 *.log
-
-# Cypress artifacts
-cypress/videos/
-cypress/screenshots/
-cypress/downloads/
 
 # macOS
 .DS_Store

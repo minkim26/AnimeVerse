@@ -43,3 +43,6 @@ $RECYCLE.BIN/
 .idea/
 *.swp
 *.swo
+
+# Claude Code local state (per-developer settings, worktrees)
+.claude/

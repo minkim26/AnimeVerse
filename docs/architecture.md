@@ -10,7 +10,8 @@ This is a deeper breakdown of AnimeVerse's services and how they talk to each ot
 | API | Express 5 + TypeScript | `anime-verse-backend`, Docker `api` service | Postgres (via Prisma), Supabase Storage, RabbitMQ |
 | Consumer | Node/TypeScript worker (`consumer.ts`) | Docker `consumer` service | RabbitMQ, Supabase Storage, Postgres (via Prisma) |
 | Database | Postgres | Docker `postgres` service (or a hosted Postgres instance) | — |
-| Queue | RabbitMQ | Docker `rabbitmq` service | — |
+| Queue | RabbitMQ | Docker `rabbitmq` service (management plugin enabled, UI on `:15672`) | — |
+| Cache / rate limiter | Redis | Docker `redis` service | — |
 | File storage | Supabase Storage | Hosted (Supabase project) | — |
 
 There is no reverse proxy or API gateway — the frontend talks to the Express API and to Kitsu directly, over whatever origins `VITE_API_URL` and Kitsu's public API resolve to.
@@ -32,6 +33,14 @@ The frontend calls `https://kitsu.io/api/edge/...` directly from the browser (`s
 ## Request flow: avatar upload (async)
 
 See [avatar-upload-pipeline.md](avatar-upload-pipeline.md) for the full walkthrough — this is the one feature in the app with a genuinely async, multi-hop request lifecycle (HTTP response comes back before the thumbnail exists).
+
+## Rate limiting and caching (Redis)
+
+Both live in `lib/redis.ts`, `lib/cache.ts`, and `lib/rateLimit.ts`.
+
+- **Rate limited** (`express-rate-limit` + `rate-limit-redis`, so limits are shared across all `api` instances rather than per-process): `POST /users` and `POST /users/login` (10 requests / 15 min, keyed by IP), and `POST /avatar` (20 requests / hour, keyed by authenticated user ID).
+- **Cached, read-through, no invalidation needed**: `GET /quotes/random` and `GET /titles/random` cache the full seeded list for 1 hour — the random pick still happens per-request against the cached list. There's no write path for these tables at runtime, so there's nothing to invalidate.
+- **Cached with explicit invalidation**: `GET /users/me` and `GET /preferences/me` (5 min TTL as a safety net). Every endpoint that mutates a field either response includes explicitly busts the corresponding key: `PATCH /users/me/password` and `POST /avatar` invalidate the user cache; `PUT /preferences/me` invalidates the preferences cache. Notably, **`consumer.ts` also invalidates the user cache** after it writes `avatarThumbnailUrl` — that field is a different process than the one that populated the cache, so without this the frontend could see a stale cached response even after the thumbnail finishes generating.
 
 ## Data model
 

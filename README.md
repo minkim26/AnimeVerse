@@ -23,7 +23,8 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 | Auth | Self-issued JWTs (`jsonwebtoken` + `bcryptjs`) — no third-party auth provider |
 | File storage | Supabase Storage (avatar originals + generated thumbnails) |
 | Async processing | RabbitMQ + a standalone `consumer.ts` worker using `sharp` for thumbnailing |
-| Orchestration | Docker Compose (`api`, `consumer`, `postgres`, `rabbitmq`, `initdb`) |
+| Caching / rate limiting | Redis (`express-rate-limit` + `rate-limit-redis` on auth/avatar endpoints, response caching on read-heavy GETs) |
+| Orchestration | Docker Compose (`api`, `consumer`, `postgres`, `rabbitmq`, `redis`, `initdb`) |
 
 ## Architecture
 
@@ -37,10 +38,16 @@ Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
                                    |-- Prisma ------> Postgres (users, preferences,
                                    |                   watchlist, reviews, quotes, titles)
                                    |
+                                   |-- Redis -------> rate limiting (auth, avatar upload)
+                                   |                   + response cache (users/me, preferences/me,
+                                   |                   quotes/random, titles/random)
+                                   |
                                    |-- avatar upload -> Supabase Storage (avatars bucket)
                                    |                     + publishes a message to RabbitMQ
                                    |
-                                   |                   RabbitMQ (avatar-thumbnails queue)
+                                   |                   RabbitMQ (avatar-thumbnails queue,
+                                   |                   dead-lettered to avatar-thumbnails.dlq
+                                   |                   on failure)
                                    |                     |
                                    |                     v
                                    |                   consumer.ts worker
@@ -48,6 +55,7 @@ Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
                                    |                     -- resizes to 128x128 via sharp
                                    |                     -- uploads thumbnail to Supabase Storage
                                    |                     -- writes avatarThumbnailUrl via Prisma
+                                   |                     -- invalidates the cached users/me entry
 ```
 
 Recommendations and the profile page's random-anime feature call Kitsu directly from the browser — there is no backend proxy for that traffic, same as before the rewrite.
@@ -109,6 +117,8 @@ npm run dev                       # http://localhost:5173
 | `SUPABASE_URL` | The AnimeVerse Supabase project's API URL. |
 | `SUPABASE_KEY` | Supabase **service_role** key — server-side only, never shipped to the frontend. |
 | `RABBITMQ_URL` | RabbitMQ connection string. `rabbitmq` as host inside Docker Compose, `localhost` outside it. |
+| `REDIS_URL` | Redis connection string, used for rate limiting and response caching. `redis` as host inside Docker Compose, `localhost` outside it. |
+| `FRONTEND_URL` | Origin allowed to make cross-origin requests to the API (CORS). The server refuses to start if this is unset. |
 
 ### root `.env` (Vite, safe to expose client-side)
 
@@ -135,6 +145,7 @@ npm run dev                       # http://localhost:5173
 | `npm start` | Run the API once (used by the Docker image) |
 | `npm run initdb` | Run Prisma migrations, then seed `Quote`/`Title` from `data/*.json` |
 | `npm run build` | Type-check only (`tsc --noEmit`) |
+| `npm test` | Run the Vitest suite (`test/`, plus unit tests colocated with their source files) against a real Postgres/Redis/RabbitMQ — start those first via `docker compose up postgres redis rabbitmq initdb` |
 
 ## API Reference
 
@@ -142,11 +153,11 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 
 | Method | Path | Auth | Body | Notes |
 |---|---|---|---|---|
-| POST | `/users` | | `{ email, password }` | Signup |
-| POST | `/users/login` | | `{ email, password }` | Returns `{ token }` |
-| GET | `/users/me` | ✓ | — | Current user (password field stripped) |
+| POST | `/users` | | `{ email, password }` | Signup. Rate limited (10 requests / 15 min / IP). |
+| POST | `/users/login` | | `{ email, password }` | Returns `{ token }`. Rate limited (10 requests / 15 min / IP). |
+| GET | `/users/me` | ✓ | — | Current user (password field stripped). Cached in Redis for 5 min. |
 | PATCH | `/users/me/password` | ✓ | `{ oldPassword, newPassword }` | Re-verifies `oldPassword` via bcrypt before updating |
-| GET | `/preferences/me` | ✓ | — | Returns `{ genres: [] }` if none saved |
+| GET | `/preferences/me` | ✓ | — | Returns `{ genres: [] }` if none saved. Cached in Redis for 5 min. |
 | PUT | `/preferences/me` | ✓ | `{ genres: string[] }` | Full-replace upsert |
 | GET | `/watchlist` | ✓ | — | Provisioned — no frontend page consumes this yet |
 | POST | `/watchlist` | ✓ | `{ animeId, title?, posterUrl? }` | Upsert on `(userId, animeId)` |
@@ -154,9 +165,9 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 | GET | `/reviews` | ✓ | — | Provisioned — no frontend page consumes this yet |
 | POST | `/reviews` | ✓ | `{ animeId, rating, reviewText }` | Upsert on `(userId, animeId)` |
 | DELETE | `/reviews/:animeId` | ✓ | — | |
-| GET | `/quotes/random` | | — | `{ quote, character, anime }` |
-| GET | `/titles/random` | | — | `{ title, episodes }` |
-| POST | `/avatar` | ✓ | `multipart/form-data`, field `file` | Uploads original to Supabase, publishes a thumbnail job, returns `{ avatarUrl }` |
+| GET | `/quotes/random` | | — | `{ quote, character, anime }`. Full list cached in Redis for 1 hour. |
+| GET | `/titles/random` | | — | `{ title, episodes }`. Full list cached in Redis for 1 hour. |
+| POST | `/avatar` | ✓ | `multipart/form-data`, field `file` | Uploads original to Supabase, publishes a thumbnail job, returns `{ avatarUrl }`. Rate limited (20 requests / hour / user). |
 | GET | `/health` | | — | `{ status: 'ok' }` |
 
 ## Project Structure
@@ -178,7 +189,8 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 │   └── microservice-a-profile-image.md   # archived original microservice README
 └── anime-verse-backend/
     ├── api/                              # users, preferences, watchlist, reviews, quotes, titles, avatar
-    ├── lib/                              # prisma.ts, auth.ts, zod.ts, supabase.ts
+    ├── lib/                              # prisma.ts, auth.ts, zod.ts, supabase.ts, redis.ts,
+    │                                      # cache.ts, rateLimit.ts, queue.ts
     ├── prisma/                           # schema.prisma, migrations, seed.ts
     ├── data/                             # quotes.json, titles.json (seed source)
     ├── server.ts                         # Express app + error handler

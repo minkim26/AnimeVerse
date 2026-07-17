@@ -4,10 +4,13 @@ import bcrypt from 'bcryptjs'
 import prisma from '../lib/prisma.ts'
 import { User, UpdatePassword } from '../lib/zod.ts'
 import { generateToken, requireAuth, type AuthenticatedRequest } from '../lib/auth.ts'
+import { getJSON, setJSON, invalidate, userCacheKey } from '../lib/cache.ts'
+import { authLimiter } from '../lib/rateLimit.ts'
 
 const router = Router()
 
 const BCRYPT_COST_FACTOR = 10
+const USER_CACHE_TTL_SECONDS = 5 * 60
 
 /*
  * POST /users — Register a new user.
@@ -19,7 +22,7 @@ const BCRYPT_COST_FACTOR = 10
  *
  * Returns: 201 { id } on success
  */
-router.post('/', async (req, res) => {
+router.post('/', authLimiter, async (req, res) => {
     const data = User.parse(req.body)
 
     const existing = await prisma.user.findUnique({ where: { email: data.email } })
@@ -44,7 +47,7 @@ router.post('/', async (req, res) => {
  *
  * Returns: 200 { token } on success, 401 on invalid credentials
  */
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
     const { email, password } = req.body
 
     if (!email || !password) {
@@ -62,15 +65,23 @@ router.post('/login', async (req, res) => {
 
 /*
  * GET /users/me — Fetch the authenticated user's profile (excluding
- * their password hash).
+ * their password hash). Cached in Redis — invalidated by any endpoint that
+ * changes a field this response includes (avatar upload, password change).
  */
 router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
+    const cacheKey = userCacheKey(req.user!.id)
+    const cached = await getJSON(cacheKey)
+    if (cached) {
+        return res.status(200).send(cached)
+    }
+
     const user = await prisma.user.findUnique({ where: { id: req.user!.id } })
     if (!user) {
         return res.status(404).send({ error: 'User not found' })
     }
 
     const { password, ...userWithoutPassword } = user
+    await setJSON(cacheKey, userWithoutPassword, USER_CACHE_TTL_SECONDS)
     res.status(200).send(userWithoutPassword)
 })
 
@@ -95,6 +106,7 @@ router.patch('/me/password', requireAuth, async (req: AuthenticatedRequest, res)
 
     const hashedNewPassword = await bcrypt.hash(data.newPassword, BCRYPT_COST_FACTOR)
     await prisma.user.update({ where: { id: user.id }, data: { password: hashedNewPassword } })
+    await invalidate(userCacheKey(user.id))
 
     res.status(204).send()
 })

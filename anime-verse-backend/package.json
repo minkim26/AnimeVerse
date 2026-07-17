@@ -1,28 +1,49 @@
 {
   "name": "anime-verse-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
+  "description": "AnimeVerse API — Express, Prisma, Zod",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "serve -p 3001 app"
+    "preinitdb": "prisma migrate deploy && prisma generate",
+    "initdb": "tsx prisma/seed.ts",
+    "prestart": "prisma generate",
+    "start": "tsx server.ts",
+    "dev": "tsx watch server.ts",
+    "build": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
-    "bcrypt": "^5.1.1",
-    "bcryptjs": "^2.4.3",
-    "body-parser": "^1.20.2",
-    "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.3.4",
-    "serve": "^14.2.3"
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@supabase/supabase-js": "^2.106.2",
+    "amqplib": "^0.10.9",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "pg": "^8.20.0",
+    "sharp": "^0.34.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@testing-library/cypress": "^10.0.2",
-    "cross-env": "^7.0.3",
-    "cypress": "^13.10.0",
-    "start-server-and-test": "^2.0.3"
+    "@types/amqplib": "^0.10.7",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/morgan": "^1.9.9",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.10.2",
+    "prisma": "^7.8.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "prisma@7.8.0": true,
+    "@prisma/engines@7.8.0": true,
+    "sharp@0.34.5": true
   }
 }

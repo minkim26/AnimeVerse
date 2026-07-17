@@ -1,0 +1,75 @@
+datasource db {
+    provider = "postgresql"
+}
+
+generator client {
+    provider = "prisma-client"
+    output   = "../generated/prisma"
+}
+
+// User model — stores registered application users.
+// Passwords are stored as bcrypt hashes — never plain text.
+model User {
+    id                 Int             @id @default(autoincrement())
+    email              String          @unique
+    password           String
+    avatarUrl          String?
+    avatarThumbnailUrl String?
+    createdAt          DateTime        @default(now())
+    preferences        Preference?
+    watchlist          WatchlistItem[]
+    reviews            Review[]
+}
+
+// Preference — one row per user, full-replace semantics for their genre list.
+model Preference {
+    userId    Int      @id
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    genres    String[]
+    updatedAt DateTime @updatedAt
+}
+
+// WatchlistItem — an anime a user has saved. Provisioned for API completeness;
+// no frontend page consumes this yet.
+model WatchlistItem {
+    id        Int      @id @default(autoincrement())
+    userId    Int
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    animeId   String
+    title     String?
+    posterUrl String?
+    addedAt   DateTime @default(now())
+
+    @@unique([userId, animeId])
+}
+
+// Review — a user's rating/comment on an anime. Provisioned for API
+// completeness; no frontend page consumes this yet.
+model Review {
+    id         Int      @id @default(autoincrement())
+    userId     Int
+    user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    animeId    String
+    rating     Int
+    reviewText String
+    createdAt  DateTime @default(now())
+
+    @@unique([userId, animeId])
+}
+
+// Quote — static anime quote content, seeded once. Replaces the old
+// animeQuoteService.py hardcoded list.
+model Quote {
+    id        Int    @id @default(autoincrement())
+    quote     String
+    character String
+    anime     String
+}
+
+// Title — static anime title/episode-count content, seeded once. Replaces
+// the old animeTitleService.py hardcoded list.
+model Title {
+    id       Int    @id @default(autoincrement())
+    title    String
+    episodes Int
+}

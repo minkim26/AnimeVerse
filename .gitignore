@@ -43,3 +43,6 @@ $RECYCLE.BIN/
 .idea/
 *.swp
 *.swo
+
+# Superpowers brainstorming companion
+.superpowers/

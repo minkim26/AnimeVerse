@@ -1,5 +1,14 @@
-import { describe, it, expect } from 'vitest'
-import { animeTitle, animeSynopsis, type AniListAnime } from './anilist.ts'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import {
+  animeTitle,
+  animeSynopsis,
+  fetchAnimeByGenres,
+  fetchTrendingNow,
+  fetchNewReleases,
+  fetchRandomRecommendations,
+  fetchRandomAnime,
+  type AniListAnime,
+} from './anilist.ts'
 
 function makeAnime(overrides: Partial<AniListAnime> = {}): AniListAnime {
   return {
@@ -38,5 +47,96 @@ describe('animeSynopsis', () => {
 
   it('returns an empty string when description is null', () => {
     expect(animeSynopsis(makeAnime({ description: null }))).toBe('')
+  })
+})
+
+function mockAniListResponse(media: unknown[]): Response {
+  return {
+    ok: true,
+    json: async () => ({ data: { Page: { media } } }),
+  } as Response
+}
+
+function lastRequestVariables(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
+  const [, options] = fetchMock.mock.calls[0] as [string, { body: string }]
+  return JSON.parse(options.body).variables
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('fetchAnimeByGenres', () => {
+  it('sends the requested genres and returns the media list', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([{ id: 1 }]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchAnimeByGenres(['Action', 'Comedy'])
+
+    expect(result).toEqual([{ id: 1 }])
+    expect(lastRequestVariables(fetchMock).genre_in).toEqual(['Action', 'Comedy'])
+  })
+})
+
+describe('fetchTrendingNow', () => {
+  it('sorts by TRENDING_DESC', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchTrendingNow()
+
+    expect(lastRequestVariables(fetchMock).sort).toEqual(['TRENDING_DESC'])
+  })
+})
+
+describe('fetchNewReleases', () => {
+  it('filters to currently releasing anime sorted by newest start date', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchNewReleases()
+
+    const variables = lastRequestVariables(fetchMock)
+    expect(variables.status).toBe('RELEASING')
+    expect(variables.sort).toEqual(['START_DATE_DESC'])
+  })
+})
+
+describe('fetchRandomRecommendations', () => {
+  it('makes exactly one request and returns 12 results', async () => {
+    const pool = Array.from({ length: 40 }, (_, i) => ({ id: i }))
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse(pool))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchRandomRecommendations()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toHaveLength(12)
+  })
+})
+
+describe('fetchRandomAnime', () => {
+  it('makes exactly one request and returns a single formatted anime', async () => {
+    const pool = [
+      {
+        id: 1,
+        title: { english: 'Test Anime', romaji: null },
+        coverImage: { medium: 'med.jpg', large: 'large.jpg' },
+        description: 'A <b>test</b> synopsis.',
+        genres: [],
+        tags: [],
+      },
+    ]
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse(pool))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchRandomAnime()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({
+      title: 'Test Anime',
+      imageUrl: 'large.jpg',
+      description: 'A test synopsis.',
+    })
   })
 })

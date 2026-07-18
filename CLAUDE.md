@@ -10,7 +10,7 @@ AnimeVerse is an anime recommendation web app: a React 19 + Vite + TypeScript SP
 
 ## Architecture
 
-**Frontend** (repo root, `src/`): React SPA built with Vite. Routes live in `src/App.tsx` — `/`, `/login`, `/signup`, `/privacy-policy` are public; `/preferences`, `/recommendations`, `/profile` are wrapped in `ProtectedRoute` (redirects to `/login` if no JWT in `localStorage`). `src/services/` holds one thin fetch wrapper per backend resource (`api.ts` is the shared base — reads `VITE_API_URL`, attaches `Authorization: Bearer <token>`); `src/services/kitsu.ts` calls the public Kitsu API directly from the browser, bypassing the backend entirely (recommendations, trending, new releases, random anime).
+**Frontend** (repo root, `src/`): React SPA built with Vite. Routes live in `src/App.tsx` — `/`, `/login`, `/signup`, `/privacy-policy` are public; `/preferences`, `/recommendations`, `/profile` are wrapped in `ProtectedRoute` (redirects to `/login` if no JWT in `localStorage`). `src/services/` holds one thin fetch wrapper per backend resource (`api.ts` is the shared base — reads `VITE_API_URL`, attaches `Authorization: Bearer <token>`); `src/services/anilist.ts` calls the public AniList GraphQL API directly from the browser, bypassing the backend entirely (recommendations, trending, new releases, random anime).
 
 **Backend** (`anime-verse-backend/`): Single Express 5 + TypeScript API on port **8000**. Routers live in `api/*.ts` and are aggregated in `api/index.ts`, mounted at `/`:
 - `api/users.ts` — `POST /users` (signup), `POST /users/login`, `GET /users/me`, `PATCH /users/me/password`
@@ -29,7 +29,8 @@ Auth is self-issued JWTs (`lib/auth.ts`: `generateToken`/`verifyToken`/`requireA
 
 ### Known quirks worth checking before assuming behavior
 
-- Kitsu calls happen entirely client-side (`src/services/kitsu.ts`) — the Express API has no route that proxies or caches Kitsu data. Don't look for a backend endpoint for recommendations; there isn't one.
+- AniList calls happen entirely client-side (`src/services/anilist.ts`) — the Express API has no route that proxies or caches AniList data for browsing (that changes once the recommendation-engine plan adds a server-side `Anime` cache). Don't look for a backend endpoint for trending/new-releases/random; there isn't one yet.
+- AniList's `description(asHtml: false)` field still contains embedded HTML tags in practice — always render synopses through `animeSynopsis()`, never the raw `description` field.
 - Watchlist and Reviews are fully implemented on the backend (models, Zod schemas, REST routes, ownership checks) but have zero frontend consumers — this is a deliberate scope decision from the modernization rewrite, not a bug or an oversight.
 - `SUPABASE_KEY` must be the Supabase **service_role** key and is server-side only (`lib/supabase.ts`); it must never be sent to or read by the frontend.
 - The avatar upload response returns `avatarUrl` immediately but `avatarThumbnailUrl` is only populated after the RabbitMQ consumer finishes processing — the frontend (`Profile.tsx`) shows a "Generating thumbnail..." state in the gap. Don't assume both URLs are present right after upload.

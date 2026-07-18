@@ -8,12 +8,12 @@ import {
   fetchTrendingNow,
   fetchNewReleases,
   fetchRandomRecommendations,
-  type KitsuAnime,
-} from '../services/kitsu.ts'
+  type AniListAnime,
+} from '../services/anilist.ts'
 
 interface AnimeSectionProps {
   title: string
-  anime: KitsuAnime[] | null
+  anime: AniListAnime[] | null
 }
 
 function AnimeSection({ title, anime }: AnimeSectionProps) {
@@ -25,7 +25,7 @@ function AnimeSection({ title, anime }: AnimeSectionProps) {
       ) : anime.length === 0 ? (
         <p className="text-[var(--color-muted)]">Nothing to show here yet.</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-start">
           {anime.map((a) => (
             <AnimeCard key={a.id} anime={a} />
           ))}
@@ -36,10 +36,10 @@ function AnimeSection({ title, anime }: AnimeSectionProps) {
 }
 
 export default function Recommendations() {
-  const [byGenre, setByGenre] = useState<KitsuAnime[] | null>(null)
-  const [trending, setTrending] = useState<KitsuAnime[] | null>(null)
-  const [newReleases, setNewReleases] = useState<KitsuAnime[] | null>(null)
-  const [random, setRandom] = useState<KitsuAnime[] | null>(null)
+  const [byGenre, setByGenre] = useState<AniListAnime[] | null>(null)
+  const [trending, setTrending] = useState<AniListAnime[] | null>(null)
+  const [newReleases, setNewReleases] = useState<AniListAnime[] | null>(null)
+  const [random, setRandom] = useState<AniListAnime[] | null>(null)
 
   useEffect(() => {
     getPreferences().then((genres) => fetchAnimeByGenres(genres).then(setByGenre))

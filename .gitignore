@@ -46,3 +46,11 @@ $RECYCLE.BIN/
 
 # Claude Code local state (per-developer settings, worktrees)
 .claude/
+
+# Superpowers brainstorming companion
+.superpowers/
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

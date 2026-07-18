@@ -8,7 +8,7 @@ import { ApiError } from '../services/api.ts'
 import { getPreferences } from '../services/preferences.ts'
 import { getRandomQuote, type Quote } from '../services/quotes.ts'
 import { getRandomTitle, type Title } from '../services/titles.ts'
-import { fetchRandomAnime } from '../services/kitsu.ts'
+import { fetchRandomAnime } from '../services/anilist.ts'
 import { uploadAvatar } from '../services/avatar.ts'
 
 interface AvatarUploadProps {

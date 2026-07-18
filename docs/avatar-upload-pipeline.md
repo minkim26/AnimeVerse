@@ -46,7 +46,8 @@ The client only sees the top row (`POST /avatar` → `201 { avatarUrl }`). Every
 - Connects to RabbitMQ, asserts the same `avatar-thumbnails` queue (`durable: true`), and sets `prefetch(1)` — it processes one message at a time rather than pulling the whole queue into memory.
 - For each message: downloads the original from the `avatars` bucket, resizes to 128x128 with `sharp` (`fit: 'cover'`, re-encoded as JPEG regardless of the original format), and uploads the result to the `avatar-thumbnails` bucket using the same base filename with a `.jpg` extension.
 - `User.avatarThumbnailUrl` is updated via Prisma using the thumbnail's public URL.
-- On success, the message is acknowledged (`channel.ack`). On any failure (bad JSON, download error, upload error, Prisma error), the message is `nack`'d with `requeue: false` — it goes to RabbitMQ's default dead-lettering behavior (dropped, since no dead-letter exchange is configured) rather than retried indefinitely.
+- On success, the message is acknowledged (`channel.ack`). On any failure (bad JSON, download error, upload error, Prisma error), the message is `nack`'d with `requeue: false`. The `avatar-thumbnails` queue is declared with a dead-letter exchange (`lib/queue.ts`'s `setupAvatarQueue`), so a nack'd message lands in `avatar-thumbnails.dlq` instead of vanishing — inspect it via the RabbitMQ management UI at `http://localhost:15672` (default `guest`/`guest`, local dev only). Nothing consumes the DLQ automatically; failed jobs sit there for manual inspection/reprocessing rather than retrying with backoff.
+- After successfully writing `avatarThumbnailUrl`, the consumer also invalidates the Redis-cached `GET /users/me` response for that user (see [architecture.md](architecture.md#rate-limiting-and-caching-redis)) — otherwise the frontend could keep seeing a stale cached response even after the thumbnail is ready.
 
 ### 3. Frontend behavior (`src/pages/Profile.tsx`)
 
@@ -57,6 +58,6 @@ The client only sees the top row (`POST /avatar` → `201 { avatarUrl }`). Every
 
 ## Debugging
 
-- **Thumbnail never appears**: check the `consumer` service logs (`docker compose logs consumer`) for a stack trace, and check the RabbitMQ management UI (if enabled) for messages stuck in `avatar-thumbnails` or being redelivered.
+- **Thumbnail never appears**: check the `consumer` service logs (`docker compose logs consumer`) for a stack trace, then check the RabbitMQ management UI at `http://localhost:15672` — a message sitting in `avatar-thumbnails.dlq` means the consumer nack'd it (the logs will show why); a message stuck in `avatar-thumbnails` itself means the consumer isn't running or isn't connected.
 - **Upload succeeds but `avatarUrl` doesn't load in the browser**: confirm the `avatars` bucket is public (see [supabase-setup.md](supabase-setup.md)) — a private bucket's public URL will 400/403 even though the upload itself succeeded.
 - **RabbitMQ publish errors in the API logs**: confirm `RABBITMQ_URL` is reachable from wherever the API process is running (`rabbitmq` as host inside Docker Compose, `localhost` outside it) and that the `rabbitmq` container's health check is passing before the API starts.

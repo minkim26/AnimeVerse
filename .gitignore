@@ -44,6 +44,9 @@ $RECYCLE.BIN/
 *.swp
 *.swo
 
+# Claude Code local state (per-developer settings, worktrees)
+.claude/
+
 # Superpowers brainstorming companion
 .superpowers/
 

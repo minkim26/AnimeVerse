@@ -6,6 +6,9 @@ import path from 'path'
 import prisma from '../lib/prisma.ts'
 import supabase from '../lib/supabase.ts'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.ts'
+import { invalidate, userCacheKey } from '../lib/cache.ts'
+import { uploadLimiter } from '../lib/rateLimit.ts'
+import { AVATAR_QUEUE, setupAvatarQueue } from '../lib/queue.ts'
 
 const router = Router()
 
@@ -25,7 +28,7 @@ async function getChannel(): Promise<amqplib.Channel> {
     if (!channel) {
         const conn = await amqplib.connect(process.env.RABBITMQ_URL || 'amqp://localhost')
         channel = await conn.createChannel()
-        await channel.assertQueue('avatar-thumbnails', { durable: true })
+        await setupAvatarQueue(channel)
     }
     return channel
 }
@@ -38,7 +41,7 @@ const MIME_TO_EXT: Record<string, string> = {
     'image/webp': '.webp'
 }
 
-function mimeToExt(mimetype: string): string {
+export function mimeToExt(mimetype: string): string {
     return MIME_TO_EXT[mimetype] || path.extname(mimetype.split('/')[1] ?? '') || '.bin'
 }
 
@@ -48,7 +51,7 @@ function mimeToExt(mimetype: string): string {
  * saves that URL on the user, then publishes a RabbitMQ message so
  * consumer.ts can generate a thumbnail asynchronously.
  */
-router.post('/', requireAuth, upload.single('file'), async (req: AuthenticatedRequest, res) => {
+router.post('/', requireAuth, uploadLimiter, upload.single('file'), async (req: AuthenticatedRequest, res) => {
     if (!req.file) {
         return res.status(400).send({ error: 'A file field containing an image is required' })
     }
@@ -73,11 +76,12 @@ router.post('/', requireAuth, upload.single('file'), async (req: AuthenticatedRe
         where: { id: req.user!.id },
         data: { avatarUrl: publicUrl }
     })
+    await invalidate(userCacheKey(req.user!.id))
 
     try {
         const ch = await getChannel()
         ch.sendToQueue(
-            'avatar-thumbnails',
+            AVATAR_QUEUE,
             Buffer.from(JSON.stringify({ userId: req.user!.id, filename })),
             { persistent: true }
         )

@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { animeTitle, type KitsuAnime } from '../services/kitsu.ts'
+import { animeTitle, animeSynopsis, type AniListAnime } from '../services/anilist.ts'
 
 interface AnimeCardProps {
-  anime: KitsuAnime
+  anime: AniListAnime
 }
 
 export default function AnimeCard({ anime }: AnimeCardProps) {
   const [showSynopsis, setShowSynopsis] = useState(false)
   const title = animeTitle(anime)
-  const poster = anime.attributes.posterImage?.small
+  const poster = anime.coverImage.medium
 
   return (
     <div className="bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm hover:-translate-y-1 transition-transform">
@@ -21,7 +21,7 @@ export default function AnimeCard({ anime }: AnimeCardProps) {
         {poster && <img src={poster} alt={title} className="w-full rounded-xl object-cover" />}
       </button>
       {showSynopsis && (
-        <p className="text-xs text-[var(--color-muted)] mt-2 line-clamp-6">{anime.attributes.synopsis}</p>
+        <p className="text-xs text-[var(--color-muted)] mt-2 line-clamp-6">{animeSynopsis(anime)}</p>
       )}
     </div>
   )

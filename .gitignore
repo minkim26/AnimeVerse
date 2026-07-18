@@ -46,3 +46,8 @@ $RECYCLE.BIN/
 
 # Superpowers brainstorming companion
 .superpowers/
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

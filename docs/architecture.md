@@ -6,14 +6,14 @@ This is a deeper breakdown of AnimeVerse's services and how they talk to each ot
 
 | Service | Tech | Runs where | Talks to |
 |---|---|---|---|
-| Frontend | React 19 + Vite + TypeScript | Browser (dev server or static build) | Express API, Kitsu (directly) |
+| Frontend | React 19 + Vite + TypeScript | Browser (dev server or static build) | Express API, AniList (directly) |
 | API | Express 5 + TypeScript | `anime-verse-backend`, Docker `api` service | Postgres (via Prisma), Supabase Storage, RabbitMQ |
 | Consumer | Node/TypeScript worker (`consumer.ts`) | Docker `consumer` service | RabbitMQ, Supabase Storage, Postgres (via Prisma) |
 | Database | Postgres | Docker `postgres` service (or a hosted Postgres instance) | — |
 | Queue | RabbitMQ | Docker `rabbitmq` service | — |
 | File storage | Supabase Storage | Hosted (Supabase project) | — |
 
-There is no reverse proxy or API gateway — the frontend talks to the Express API and to Kitsu directly, over whatever origins `VITE_API_URL` and Kitsu's public API resolve to.
+There is no reverse proxy or API gateway — the frontend talks to the Express API and to AniList directly, over whatever origins `VITE_API_URL` and AniList's public GraphQL API resolve to.
 
 ## Request flow: a typical authenticated request
 
@@ -22,12 +22,12 @@ There is no reverse proxy or API gateway — the frontend talks to the Express A
 3. The route handler validates the request body with a Zod schema (`lib/zod.ts`), then reads/writes via Prisma, scoped to `req.user.id`. There is no separate authorization layer — ownership is enforced by always filtering/writing on the authenticated user's own ID, never a client-supplied one.
 4. Errors thrown by Zod or Prisma are caught by `server.ts`'s centralized error handler and translated to an HTTP status (`ZodError` → 400, Prisma `P2003` invalid foreign key → 400, Prisma `P2025` record not found → falls through to the 404 handler).
 
-## Request flow: Kitsu-backed pages (Recommendations, random anime)
+## Request flow: AniList-backed pages (Recommendations, random anime)
 
-The frontend calls `https://kitsu.io/api/edge/...` directly from the browser (`src/services/kitsu.ts`) — the Express API is not involved at all for this data. This means:
+The frontend calls `https://graphql.anilist.co` directly from the browser (`src/services/anilist.ts`) — the Express API is not involved at all for this data. This means:
 
-- No backend caching or rate-limiting sits in front of Kitsu; the app is subject to Kitsu's own public rate limits.
-- If Kitsu is unreachable or changes its response shape, the Express API's health has no bearing on whether Recommendations/random-anime work.
+- No backend caching or rate-limiting sits in front of AniList; the app is subject to AniList's own public rate limits (30 requests/minute).
+- If AniList is unreachable or changes its response shape, the Express API's health has no bearing on whether Recommendations/random-anime work.
 
 ## Request flow: avatar upload (async)
 

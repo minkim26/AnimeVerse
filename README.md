@@ -1,6 +1,6 @@
 # AnimeVerse
 
-AnimeVerse is an anime recommendation web app. Users sign up, pick genre preferences, and get personalized, trending, new-release, and random anime recommendations pulled from the [Kitsu API](https://kitsu.io/api/edge/anime). A profile page lets users manage their account, upload a real profile picture, and play with random anime quote/title/picture generators.
+AnimeVerse is an anime recommendation web app. Users sign up, pick genre preferences, and get personalized, trending, new-release, and random anime recommendations pulled from the [AniList GraphQL API](https://anilist.gitbook.io/anilist-apiv2-docs/). A profile page lets users manage their account, upload a real profile picture, and play with random anime quote/title/picture generators.
 
 The app is a React SPA backed by a single Express + Prisma + Postgres API, orchestrated with Docker Compose. Supabase is used exclusively for file storage (avatar images); it is not used for auth or as the primary database.
 
@@ -10,7 +10,7 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 
 - **Signup / Login** — email + password auth against the API, JWT stored in `localStorage`.
 - **Preferences** — pick favorite genres (action, comedy, fantasy, horror, mystery, romance, thriller), persisted per-user in Postgres.
-- **Recommendations** — genre-matched picks, trending-now, new releases, and a random selection, fetched directly from Kitsu in the browser.
+- **Recommendations** — genre-matched picks, trending-now, new releases, and a random selection, fetched directly from AniList in the browser.
 - **Profile** — change password, upload a real profile picture (async thumbnail generation), view saved preferences, and fetch a random anime, anime title, and anime quote.
 - **Auth gating** — `/preferences`, `/recommendations`, and `/profile` redirect to `/login` if no token is present (see `src/components/ProtectedRoute.tsx`).
 
@@ -30,7 +30,7 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 ```
 Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
   |
-  |-- calls directly ------------------> Kitsu public API (src/services/kitsu.ts)
+  |-- calls directly ------------------> AniList public API (src/services/anilist.ts)
   |
   |-- calls ------------------> Express API (:8000)
                                    |
@@ -50,7 +50,7 @@ Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
                                    |                     -- writes avatarThumbnailUrl via Prisma
 ```
 
-Recommendations and the profile page's random-anime feature call Kitsu directly from the browser — there is no backend proxy for that traffic, same as before the rewrite.
+Recommendations and the profile page's random-anime feature call AniList directly from the browser — there is no backend proxy for that traffic, same as before the rewrite.
 
 See [docs/architecture.md](docs/architecture.md) for a deeper breakdown of each service and [docs/avatar-upload-pipeline.md](docs/avatar-upload-pipeline.md) for the full avatar upload request lifecycle.
 
@@ -167,7 +167,7 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 │   ├── pages/                            # Home, Login, Signup, Preferences,
 │   │                                      # Recommendations, Profile, PrivacyPolicy, NotFound
 │   ├── components/                       # Navbar, Footer, ProtectedRoute, AnimeCard, GenreCheckboxGroup
-│   ├── services/                         # api.ts (fetch wrapper), auth, preferences, kitsu,
+│   ├── services/                         # api.ts (fetch wrapper), auth, preferences, anilist,
 │   │                                      # quotes, titles, avatar — one thin client per resource
 │   └── data/genres.ts
 ├── docs/

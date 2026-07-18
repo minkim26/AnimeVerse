@@ -7,5 +7,6 @@ export default defineConfig({
   plugins: [tailwindcss(), react()],
   test: {
     environment: 'node',
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 })

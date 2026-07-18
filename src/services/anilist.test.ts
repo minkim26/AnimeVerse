@@ -14,7 +14,7 @@ function makeAnime(overrides: Partial<AniListAnime> = {}): AniListAnime {
   return {
     id: 1,
     title: { english: 'Test Anime', romaji: 'Tesuto Anime' },
-    coverImage: { medium: null, large: null },
+    coverImage: { medium: null, large: null, extraLarge: null },
     description: null,
     genres: [],
     tags: [],
@@ -121,7 +121,7 @@ describe('fetchRandomAnime', () => {
       {
         id: 1,
         title: { english: 'Test Anime', romaji: null },
-        coverImage: { medium: 'med.jpg', large: 'large.jpg' },
+        coverImage: { medium: 'med.jpg', large: 'large.jpg', extraLarge: 'xl.jpg' },
         description: 'A <b>test</b> synopsis.',
         genres: [],
         tags: [],
@@ -135,8 +135,27 @@ describe('fetchRandomAnime', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(result).toEqual({
       title: 'Test Anime',
-      imageUrl: 'large.jpg',
+      imageUrl: 'xl.jpg',
       description: 'A test synopsis.',
     })
+  })
+
+  it('falls back to a lower-resolution cover when extraLarge is missing', async () => {
+    const pool = [
+      {
+        id: 2,
+        title: { english: 'No XL Anime', romaji: null },
+        coverImage: { medium: 'med.jpg', large: 'large.jpg', extraLarge: null },
+        description: 'Synopsis.',
+        genres: [],
+        tags: [],
+      },
+    ]
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse(pool))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchRandomAnime()
+
+    expect(result.imageUrl).toBe('large.jpg')
   })
 })

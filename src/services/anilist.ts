@@ -1,7 +1,7 @@
 export interface AniListAnime {
   id: number
   title: { english: string | null; romaji: string | null }
-  coverImage: { medium: string | null; large: string | null }
+  coverImage: { medium: string | null; large: string | null; extraLarge: string | null }
   description: string | null
   genres: string[]
   tags: { name: string; rank: number }[]
@@ -28,7 +28,7 @@ const MEDIA_LIST_QUERY = `
       media(genre_in: $genre_in, sort: $sort, status: $status, type: ANIME) {
         id
         title { english romaji }
-        coverImage { medium large }
+        coverImage { medium large extraLarge }
         description(asHtml: false)
         genres
         tags { name rank }
@@ -85,7 +85,7 @@ export async function fetchRandomAnime(): Promise<{ title: string; imageUrl: str
   const anime = pool[Math.floor(Math.random() * pool.length)]!
   return {
     title: animeTitle(anime),
-    imageUrl: anime.coverImage.large ?? anime.coverImage.medium ?? '',
+    imageUrl: anime.coverImage.extraLarge ?? anime.coverImage.large ?? anime.coverImage.medium ?? '',
     description: animeSynopsis(anime),
   }
 }

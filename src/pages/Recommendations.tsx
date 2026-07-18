@@ -25,7 +25,7 @@ function AnimeSection({ title, anime }: AnimeSectionProps) {
       ) : anime.length === 0 ? (
         <p className="text-[var(--color-muted)]">Nothing to show here yet.</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-start">
           {anime.map((a) => (
             <AnimeCard key={a.id} anime={a} />
           ))}

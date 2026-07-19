@@ -6,7 +6,6 @@ import Preferences from './pages/Preferences.tsx'
 import Recommendations from './pages/Recommendations.tsx'
 import Profile from './pages/Profile.tsx'
 import PrivacyPolicy from './pages/PrivacyPolicy.tsx'
-import StyleTile from './pages/StyleTile.tsx'
 import NotFound from './pages/NotFound.tsx'
 import ProtectedRoute from './components/ProtectedRoute.tsx'
 
@@ -18,7 +17,6 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/styletile" element={<StyleTile />} />
         <Route
           path="/preferences"
           element={

@@ -43,6 +43,17 @@ Every task's requirements implicitly include this section. Copy the relevant lin
 
 ---
 
+## Human Review Gates
+
+Automated review (correctness, no-regression) and pixel visual-regression **cannot judge whether a page looks good**. Two explicit human aesthetic gates cover that, without pausing between every task (per subagent-driven-development's continuous-execution rule):
+
+1. **Design-language gate (after Task 1):** the orchestrator presents the rendered StyleTile screenshots (real Fraunces, real Tailwind-processed tokens) and pauses for the human to approve the palette/type/card language before any page is composed.
+2. **Composed-pages gate (end, in Task 7 before finishing the branch):** the orchestrator assembles the Task 2-6 page screenshots into an Artifact gallery and pauses for a final aesthetic sign-off on the actual composed pages before merge.
+
+Between those two gates, tasks execute continuously.
+
+---
+
 ## File Structure
 
 **Created:**
@@ -147,17 +158,20 @@ createRoot(document.getElementById('root')!).render(
   --color-accent: oklch(55% 0.21 28);
   --color-accent-hover: oklch(50% 0.21 28);
   --color-hero: oklch(26% 0.04 45);
+}
 
-  /* Legacy aliases — keep existing var(--color-*) references resolving */
+:root {
+  /* Legacy aliases — kept in :root (not @theme) because every component reads
+     them as arbitrary values (bg-[var(--color-primary)]), never as bare
+     utilities. Keeping them out of @theme avoids emitting phantom utilities
+     and sidesteps the @theme-plus-var() question. */
   --color-bg: var(--color-paper);
   --color-primary: var(--color-accent);
   --color-secondary: oklch(52% 0.13 250);
   --color-text: var(--color-ink);
   --color-error: oklch(55% 0.20 25);
   --color-success: oklch(58% 0.13 155);
-}
 
-:root {
   /* Radii */
   --radius-tile: 1.75rem;
   --radius-card: 1.25rem;
@@ -174,12 +188,11 @@ createRoot(document.getElementById('root')!).render(
   --duration-normal: 300ms;
 }
 
-/* Editorial display headings use Fraunces with a tight, high-contrast feel */
-.font-display {
-  font-family: var(--font-display);
-  font-optical-sizing: auto;
-  letter-spacing: -0.01em;
-}
+/* Note: Tailwind v4 auto-generates the `font-display` utility from the
+   --font-display theme key, so components keep using className="font-display"
+   for the family. Optical sizing is set once on <body> (it inherits); tight
+   editorial tracking is applied per-heading in JSX via `tracking-tight`.
+   Do NOT redefine a `.font-display` class here — it would shadow the utility. */
 
 /* Component classes — composed with Tailwind utilities in JSX */
 .surface-card {
@@ -273,6 +286,7 @@ body {
   font-family: var(--font-body);
   background-color: var(--color-bg);
   color: var(--color-text);
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
 }
 ```
@@ -616,7 +630,7 @@ git commit -m "Restyle Profile, Privacy Policy, and NotFound"
 git rm src/pages/StyleTile.tsx
 ```
 
-- [ ] **Step 2: Write `e2e/visual.spec.ts`** — visual-regression baselines for the public pages at the four breakpoints. Public pages need no auth; keep it deterministic (disable animations via reduced-motion is already global). Use `toHaveScreenshot` with `maxDiffPixelRatio` tolerance for font AA.
+- [ ] **Step 2: Write `e2e/visual.spec.ts`** — visual-regression baselines for the public pages at the four breakpoints. Public pages need no auth; keep it deterministic (disable animations via reduced-motion is already global). Use `toHaveScreenshot` with `maxDiffPixelRatio` tolerance for font AA. **Known limitation (document, do not expand scope):** this baselines only the four public pages (`/`, `/login`, `/signup`, `/privacy-policy`); the authed pages (Recommendations/Profile/Preferences) would need a login fixture and are not baselined here — they are covered by the manual screenshots + the composed-pages human gate below.
 
 ```ts
 import { test, expect } from '@playwright/test'
@@ -668,6 +682,10 @@ Expected: `clean` (no old hex/Poppins references remain). Fix any hits.
 git add -A
 git commit -m "Add visual-regression baselines, accessibility pass, and remove StyleTile"
 ```
+
+- [ ] **Step 7: Composed-pages human aesthetic gate (orchestrator action, not the implementer's)**
+
+Before finishing the branch, the orchestrator assembles the composed-page screenshots from Tasks 2-6 (Home, auth, Recommendations, Profile, Preferences, Privacy, 404) at representative breakpoints into an Artifact gallery and presents it to the human for a final aesthetic sign-off on the actual composed pages. Only after that approval proceed to superpowers:finishing-a-development-branch. This gate is about whether the pages *look good* — distinct from the correctness/regression review, which does not judge aesthetics.
 
 ---
 

@@ -63,68 +63,77 @@
    editorial tracking is applied per-heading in JSX via `tracking-tight`.
    Do NOT redefine a `.font-display` class here — it would shadow the utility. */
 
-/* Component classes — composed with Tailwind utilities in JSX */
-.surface-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-tile);
-  box-shadow: var(--shadow-sm);
-}
+/* Component classes — composed with Tailwind utilities in JSX.
+   Wrapped in @layer components: Tailwind v4 declares layer order
+   theme, base, components, utilities — placing these here (instead of
+   unlayered) lets a plain Tailwind utility class in JSX correctly override
+   any property set below, matching normal Tailwind override expectations.
+   Unlayered rules would otherwise always beat layered utilities regardless
+   of specificity, silently breaking utility overrides like `bg-transparent`
+   or `disabled:cursor-not-allowed` on these classes. */
+@layer components {
+  .surface-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-tile);
+    box-shadow: var(--shadow-sm);
+  }
 
-.dark-card {
-  background: var(--color-hero);
-  color: var(--color-paper);
-  border-radius: var(--radius-tile);
-  box-shadow: var(--shadow-md);
-}
+  .dark-card {
+    background: var(--color-hero);
+    color: var(--color-paper);
+    border-radius: var(--radius-tile);
+    box-shadow: var(--shadow-md);
+  }
 
-.tile-accent {
-  border-radius: var(--radius-tile);
-  box-shadow: var(--shadow-sm);
-}
+  .tile-accent {
+    border-radius: var(--radius-tile);
+    box-shadow: var(--shadow-sm);
+  }
 
-.bento-grid {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: clamp(0.75rem, 0.5rem + 1vw, 1.25rem);
-}
+  .bento-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: clamp(0.75rem, 0.5rem + 1vw, 1.25rem);
+  }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: var(--radius-pill);
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: transform var(--duration-fast) var(--ease-out-expo),
-    opacity var(--duration-fast) var(--ease-out-expo),
-    background-color var(--duration-fast) var(--ease-out-expo);
-}
-.btn:hover { transform: translateY(-1px); }
-.btn:active { transform: translateY(0); }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-pill);
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform var(--duration-fast) var(--ease-out-expo),
+      opacity var(--duration-fast) var(--ease-out-expo),
+      background-color var(--duration-fast) var(--ease-out-expo);
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
 
-.btn-accent {
-  background: var(--color-accent);
-  color: var(--color-paper);
-}
-.btn-accent:hover { background: var(--color-accent-hover); }
+  .btn-accent {
+    background: var(--color-accent);
+    color: var(--color-paper);
+  }
+  .btn-accent:hover { background: var(--color-accent-hover); }
 
-.btn-outline {
-  background: transparent;
-  color: var(--color-ink);
-  border-color: var(--color-line);
-}
-.btn-outline:hover { background: var(--color-surface); }
+  .btn-outline {
+    background: transparent;
+    color: var(--color-ink);
+    border-color: var(--color-line);
+  }
+  .btn-outline:hover { background: var(--color-surface); }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  border: 1px solid var(--color-line);
-  padding: 0.35rem 0.85rem;
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    padding: 0.35rem 0.85rem;
+  }
 }
 
 /* Global focus-visible ring */

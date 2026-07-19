@@ -20,23 +20,27 @@ export default function Navbar() {
   }
 
   const linkClass = (path: string) =>
-    `text-sm no-underline transition-opacity hover:opacity-70 ${
-      pathname === path ? 'font-semibold text-[var(--color-primary)]' : 'text-[var(--color-text)]'
+    `text-sm font-medium no-underline pb-1 border-b-2 transition-colors ${
+      pathname === path
+        ? 'border-[var(--color-accent)] text-[var(--color-ink)]'
+        : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]'
     }`
 
   const mobileLinkClass = (path: string) =>
-    `block py-2 text-sm no-underline transition-opacity hover:opacity-70 ${
-      pathname === path ? 'font-semibold text-[var(--color-primary)]' : 'text-[var(--color-text)]'
+    `block py-2 pl-3 -ml-3 text-sm font-medium no-underline border-l-2 transition-colors ${
+      pathname === path
+        ? 'border-[var(--color-accent)] text-[var(--color-ink)] font-semibold'
+        : 'border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]'
     }`
 
   return (
-    <nav className="relative px-6 sm:px-8 py-5">
+    <nav className="sticky top-0 z-20 backdrop-blur bg-[var(--color-paper)]/80 border-b border-[var(--color-line)] px-6 sm:px-8 py-4">
       <div className="flex items-center justify-between">
         <Link
           to="/"
-          className="flex items-center gap-2 no-underline font-display text-xl text-[var(--color-primary)]"
+          className="flex items-center gap-2 no-underline font-display text-xl sm:text-2xl tracking-tight text-[var(--color-ink)]"
         >
-          <Sparkles size={22} strokeWidth={2} />
+          <Sparkles size={22} strokeWidth={2} className="text-[var(--color-accent)]" />
           AnimeVerse
         </Link>
 
@@ -52,10 +56,7 @@ export default function Navbar() {
               <Link to="/profile" className={linkClass('/profile')}>
                 Profile
               </Link>
-              <button
-                onClick={handleLogout}
-                className="px-5 py-2 rounded-full text-sm text-white bg-[var(--color-primary)] border-none cursor-pointer transition-opacity hover:opacity-90"
-              >
+              <button onClick={handleLogout} className="btn btn-accent px-5 py-2 text-sm">
                 Logout
               </button>
             </>
@@ -64,10 +65,7 @@ export default function Navbar() {
               <Link to="/login" className={linkClass('/login')}>
                 Sign In
               </Link>
-              <Link
-                to="/signup"
-                className="px-5 py-2 rounded-full text-sm text-white no-underline bg-[var(--color-primary)] transition-opacity hover:opacity-90"
-              >
+              <Link to="/signup" className="btn btn-accent px-5 py-2 text-sm no-underline">
                 Sign Up
               </Link>
             </>
@@ -75,7 +73,7 @@ export default function Navbar() {
         </div>
 
         <button
-          className="md:hidden bg-transparent border-none cursor-pointer p-0 text-[var(--color-text)]"
+          className="md:hidden bg-transparent border-none cursor-pointer p-0 text-[var(--color-ink)]"
           onClick={() => setMenuOpen((open) => !open)}
           aria-label="Toggle menu"
         >
@@ -84,7 +82,7 @@ export default function Navbar() {
       </div>
 
       {menuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-[var(--color-surface)] shadow-lg px-6 py-4 flex flex-col z-10">
+        <div className="md:hidden absolute top-full left-0 right-0 bg-[var(--color-surface)] border-b border-[var(--color-line)] shadow-lg px-6 py-4 flex flex-col z-10">
           {loggedIn ? (
             <>
               <Link to="/preferences" className={mobileLinkClass('/preferences')} onClick={closeMenu}>
@@ -96,10 +94,7 @@ export default function Navbar() {
               <Link to="/profile" className={mobileLinkClass('/profile')} onClick={closeMenu}>
                 Profile
               </Link>
-              <button
-                onClick={handleLogout}
-                className="mt-2 px-5 py-2 rounded-full text-sm text-white bg-[var(--color-primary)] border-none cursor-pointer text-center"
-              >
+              <button onClick={handleLogout} className="btn btn-accent mt-3 px-5 py-2 text-sm">
                 Logout
               </button>
             </>
@@ -110,7 +105,7 @@ export default function Navbar() {
               </Link>
               <Link
                 to="/signup"
-                className="mt-2 px-5 py-2 rounded-full text-sm text-white no-underline bg-[var(--color-primary)] text-center"
+                className="btn btn-accent mt-3 px-5 py-2 text-sm no-underline"
                 onClick={closeMenu}
               >
                 Sign Up

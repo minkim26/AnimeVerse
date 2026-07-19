@@ -31,7 +31,7 @@ export default function Signup() {
           <div className="dark-card hidden md:flex flex-col justify-between p-10 rounded-none">
             <span
               className="pill w-fit text-xs font-medium uppercase tracking-wide"
-              style={{ background: 'transparent', borderColor: 'oklch(97.5% 0.012 85 / 0.3)', color: 'var(--color-paper)' }}
+              style={{ background: 'transparent', borderColor: 'color-mix(in oklch, var(--color-paper) 30%, transparent)', color: 'var(--color-paper)' }}
             >
               Join AnimeVerse
             </span>

@@ -63,7 +63,7 @@ export default function Preferences() {
             <button
               type="submit"
               disabled={saving}
-              className="btn btn-accent mt-6 px-8 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-accent mt-6 px-8 py-3 text-sm disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Update Preferences'}
             </button>

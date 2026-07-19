@@ -18,15 +18,20 @@ export default function GenreCheckboxGroup({ selected, onChange }: GenreCheckbox
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {GENRES.map((genre) => {
         const checked = selected.includes(genre)
+        // .pill's background/border/padding are unlayered CSS (see tokens.css) and
+        // always beat a plain Tailwind utility override (px-4 py-2, has-checked:bg-*),
+        // so both the comfortable tap-target padding and the checked pastel fill go
+        // through inline style instead. The has-checked:ring utility still works
+        // because .pill sets no box-shadow to compete with.
+        const style = {
+          padding: '0.5rem 1rem',
+          ...(checked ? { background: 'var(--color-mint)', borderColor: 'var(--color-accent)' } : {}),
+        }
         return (
           <label
             key={genre}
-            // .pill's background/border are unlayered CSS (see tokens.css) and always
-            // beat a plain Tailwind utility override, so the checked pastel fill goes
-            // through inline style instead of has-checked:bg-*. The has-checked:ring
-            // utility still works because .pill sets no box-shadow to compete with.
-            className="pill gap-2 px-4 py-2 cursor-pointer capitalize text-sm font-medium transition-colors has-checked:ring-2 has-checked:ring-[var(--color-accent)]"
-            style={checked ? { background: 'var(--color-mint)', borderColor: 'var(--color-accent)' } : undefined}
+            className="pill gap-2 cursor-pointer capitalize text-sm font-medium transition-colors has-checked:ring-2 has-checked:ring-[var(--color-accent)]"
+            style={style}
           >
             <input
               type="checkbox"

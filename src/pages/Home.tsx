@@ -67,15 +67,14 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="col-span-6 md:col-span-2 grid grid-cols-2 gap-4 md:gap-5">
+          <div className="col-span-6 md:col-span-2 grid grid-cols-2 gap-4 md:gap-5" aria-hidden="true">
             {FEATURES.map(({ icon: Icon, title }, index) => (
               <div
                 key={title}
                 className="tile-accent aspect-square flex items-center justify-center p-6 transition-transform duration-[var(--duration-normal)] ease-[var(--ease-out-expo)] md:even:rotate-2 md:odd:-rotate-2 md:hover:rotate-0 md:hover:-translate-y-1"
                 style={{ background: HERO_TILE_COLORS[index] }}
               >
-                <Icon className="text-[var(--color-ink)]" size={36} strokeWidth={1.75} aria-hidden="true" />
-                <span className="sr-only">{title}</span>
+                <Icon className="text-[var(--color-ink)]" size={36} strokeWidth={1.75} />
               </div>
             ))}
           </div>

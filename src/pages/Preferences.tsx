@@ -39,7 +39,10 @@ export default function Preferences() {
       <Navbar />
 
       <main className="flex-1 max-w-2xl mx-auto px-4 py-12 w-full">
-        <h1 className="font-display text-3xl font-bold mb-2 text-[var(--color-primary)]">
+        <span className="pill w-fit text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+          Your taste profile
+        </span>
+        <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-[var(--color-ink)] mt-4 mb-2">
           Update Your Preferences
         </h1>
         <p className="text-[var(--color-muted)] mb-8">
@@ -60,7 +63,7 @@ export default function Preferences() {
             <button
               type="submit"
               disabled={saving}
-              className="mt-6 px-6 py-3 rounded-full text-white bg-[var(--color-primary)] font-medium transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="btn btn-accent mt-6 px-8 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'Saving...' : 'Update Preferences'}
             </button>

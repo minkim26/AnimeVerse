@@ -14,16 +14,29 @@ import {
 interface AnimeSectionProps {
   title: string
   anime: AniListAnime[] | null
+  dark?: boolean
 }
 
-function AnimeSection({ title, anime }: AnimeSectionProps) {
+function AnimeSection({ title, anime, dark }: AnimeSectionProps) {
+  const mutedClass = dark ? 'text-[var(--color-paper)]/70' : 'text-[var(--color-muted)]'
+
   return (
-    <section className="py-8">
-      <h2 className="font-display text-2xl font-bold mb-4">{title}</h2>
+    <section className={dark ? 'dark-card p-6 sm:p-8 my-10' : 'py-8'}>
+      <div
+        className="flex items-center gap-3 mb-6 pb-3 border-b"
+        style={{ borderColor: dark ? 'color-mix(in oklch, var(--color-paper) 20%, transparent)' : 'var(--color-line)' }}
+      >
+        <span className="h-6 w-1.5 rounded-full shrink-0" style={{ background: 'var(--color-accent)' }} />
+        <h2
+          className={`font-display text-2xl font-semibold tracking-tight ${dark ? 'text-[var(--color-paper)]' : 'text-[var(--color-ink)]'}`}
+        >
+          {title}
+        </h2>
+      </div>
       {anime === null ? (
-        <p className="text-[var(--color-muted)]">Loading...</p>
+        <p className={mutedClass}>Loading...</p>
       ) : anime.length === 0 ? (
-        <p className="text-[var(--color-muted)]">Nothing to show here yet.</p>
+        <p className={mutedClass}>Nothing to show here yet.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-start">
           {anime.map((a) => (
@@ -53,14 +66,17 @@ export default function Recommendations() {
       <Navbar />
 
       <main className="flex-1 max-w-6xl mx-auto px-4 py-12 w-full">
-        <h1 className="font-display text-3xl font-bold mb-2 text-[var(--color-primary)]">
+        <span className="pill w-fit text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
+          Personalized picks
+        </span>
+        <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-[var(--color-ink)] mt-4 mb-2">
           Your Top Recommendations
         </h1>
-        <p className="text-[var(--color-muted)]">
+        <p className="text-[var(--color-muted)] max-w-xl">
           Click on any anime title or its image to toggle more information about it.
         </p>
 
-        <AnimeSection title="For You" anime={byGenre} />
+        <AnimeSection title="For You" anime={byGenre} dark />
         <AnimeSection title="Trending Now" anime={trending} />
         <AnimeSection title="New Releases" anime={newReleases} />
         <AnimeSection title="Random Recommendations" anime={random} />

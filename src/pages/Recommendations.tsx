@@ -18,11 +18,9 @@ interface AnimeSectionProps {
 }
 
 function AnimeSection({ title, anime, dark }: AnimeSectionProps) {
-  // .dark-card sets `color: var(--color-paper)` unlayered (see tokens.css), which
-  // always beats a layered Tailwind opacity utility like text-[...]/70 — so the
-  // muted 70% variant is expressed as an inline color-mix instead, and the heading
-  // simply inherits .dark-card's own color rather than fighting it with a
-  // same-value (and therefore dead) text-[var(--color-paper)] utility.
+  // Dynamic per-state value (muted 70% variant on the dark card) kept inline;
+  // .dark-card lives in @layer components, so a plain Tailwind opacity utility
+  // would compose fine here too — this is just a style choice, not a workaround.
   const mutedStyle = dark ? { color: 'color-mix(in oklch, var(--color-paper) 70%, transparent)' } : undefined
   const mutedClass = dark ? undefined : 'text-[var(--color-muted)]'
 

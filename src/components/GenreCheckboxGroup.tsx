@@ -18,11 +18,9 @@ export default function GenreCheckboxGroup({ selected, onChange }: GenreCheckbox
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {GENRES.map((genre) => {
         const checked = selected.includes(genre)
-        // .pill's background/border/padding are unlayered CSS (see tokens.css) and
-        // always beat a plain Tailwind utility override (px-4 py-2, has-checked:bg-*),
-        // so both the comfortable tap-target padding and the checked pastel fill go
-        // through inline style instead. The has-checked:ring utility still works
-        // because .pill sets no box-shadow to compete with.
+        // Dynamic per-state values (checked fill, tap-target padding) kept inline;
+        // .pill lives in @layer components, so a plain Tailwind utility would
+        // compose fine here too — this is just a style choice, not a workaround.
         const style = {
           padding: '0.5rem 1rem',
           ...(checked ? { background: 'var(--color-mint)', borderColor: 'var(--color-accent)' } : {}),

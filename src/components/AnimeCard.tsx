@@ -12,13 +12,12 @@ export default function AnimeCard({ anime }: AnimeCardProps) {
   const synopsis = animeSynopsis(anime)
 
   return (
-    <div className="flex flex-col bg-[var(--color-surface)] rounded-2xl p-4 shadow-sm hover:-translate-y-1 transition-transform">
+    <div className="surface-card flex flex-col p-3 hover:-translate-y-1 transition-transform duration-[var(--duration-normal)] ease-[var(--ease-out-expo)]">
       <button
         type="button"
         onClick={() => setShowSynopsis((v) => !v)}
         className="block w-full text-left bg-transparent border-none p-0 cursor-pointer"
       >
-        <h3 className="font-display text-sm font-semibold mb-2">{title}</h3>
         {poster && (
           <img
             src={poster}
@@ -27,9 +26,12 @@ export default function AnimeCard({ anime }: AnimeCardProps) {
             className="w-full rounded-xl object-cover aspect-[2/3]"
           />
         )}
+        <h3 className="font-display text-sm font-semibold mt-3 leading-snug text-[var(--color-ink)]">
+          {title}
+        </h3>
       </button>
       {showSynopsis && synopsis && (
-        <p className="text-xs text-[var(--color-muted)] mt-2">{synopsis}</p>
+        <p className="text-xs text-[var(--color-muted)] mt-2 leading-relaxed">{synopsis}</p>
       )}
     </div>
   )

@@ -40,7 +40,7 @@ export default function Signup() {
                 Tell us what you love. We'll find your next binge.
               </h2>
               <p className="text-sm opacity-80 max-w-xs">
-                Create an account to unlock personalized recommendations tuned to your taste.
+                Create an account to get recommendations tuned to your taste.
               </p>
             </div>
           </div>

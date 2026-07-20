@@ -57,7 +57,7 @@ export default function Home() {
               Welcome to AnimeVerse
             </h1>
             <p className="text-lg text-[var(--color-muted)] max-w-md">
-              Tell us what you love and we'll surface the shows worth your next binge — trending hits, fresh
+              Tell us what you love, and we'll surface the shows worth your next binge: trending hits, fresh
               releases, and a few wildcard picks along the way.
             </p>
             <div>
@@ -111,10 +111,10 @@ export default function Home() {
             className="font-display font-black text-[var(--color-ink)] mb-4"
             style={{ fontSize: 'var(--text-display)' }}
           >
-            Start your anime journey today
+            Ready to find your next watch?
           </h2>
           <p className="text-[var(--color-muted)] mb-8 text-lg">
-            Sign up now to unlock personalized recommendations, or sign back in to pick up where you left off.
+            Sign up for recommendations tuned to your taste, or sign back in to pick up where you left off.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link to="/signup" className="btn btn-accent px-8 py-3 text-base no-underline">

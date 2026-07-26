@@ -18,7 +18,7 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 
 | Layer | Stack |
 |---|---|
-| Frontend | React 19 + Vite 7 + TypeScript, Tailwind CSS v4, react-router-dom v7 |
+| Frontend | React 19 + Vite 7 + TypeScript, Tailwind CSS v4, react-router v8 |
 | Backend | Express 5 + TypeScript, Prisma 7 (Postgres), Zod 4 validation |
 | Auth | Self-issued JWTs (`jsonwebtoken` + `bcryptjs`) — no third-party auth provider |
 | File storage | Supabase Storage (avatar originals + generated thumbnails) |
@@ -136,6 +136,9 @@ npm run dev                       # http://localhost:5173
 | `npm run build` | Type-check (`tsc -b`) and produce a production build |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build locally |
+| `npm test` | Run the Vitest unit suite |
+| `npm run test:e2e` | Full Playwright suite (functional + visual regression) — needs the backend running on `:8000` |
+| `npm run test:e2e:update` | Refresh this machine's platform-specific visual-regression baselines (e.g. `-darwin` on macOS) for `e2e/visual.spec.ts` only — no backend needed |
 
 ### Backend (`anime-verse-backend/`)
 
@@ -202,6 +205,8 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 ## Continuous Integration
 
 `.github/workflows/ci.yml` runs on every push/PR to `main`, in three jobs: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against service containers, then runs the Playwright suite from the root package). None of the jobs deploy anywhere.
+
+A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_dispatch`-only (manual trigger, never runs on push/PR) and regenerates the Linux visual-regression baselines in `e2e/visual.spec.ts-snapshots/`, opening a PR with the result. See `CLAUDE.md`'s "UI Change Workflow" section for when to run it.
 
 ## Known Limitations
 

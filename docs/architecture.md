@@ -65,6 +65,8 @@ Auth and primary data live in Postgres via Prisma with self-issued JWTs, not Sup
 
 `.github/workflows/ci.yml` runs three jobs on every push/PR to `main`: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (starts the real Express API against the same kind of service containers, then runs the Playwright suite against a dedicated dev server on `:5174`). No job deploys anywhere — it's build/test verification only.
 
+A fourth workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_dispatch`-only (manual trigger, never runs on push/PR). It regenerates the Linux Playwright visual-regression baselines and opens a PR with the diff — see `CLAUDE.md`'s "UI Change Workflow" section.
+
 ## Deployment status
 
 No production deployment target is configured. The old `static.yml` GitHub Pages workflow is gone entirely; nothing has replaced it. Running this stack anywhere other than local Docker Compose currently requires manually provisioning a host that can run `docker compose up` (Railway, Render, Fly.io, or a VPS) and pointing `VITE_API_URL` at it.

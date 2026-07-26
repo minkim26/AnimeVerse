@@ -13,8 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-pg": "^7.9.0",
+    "@prisma/client": "^7.9.0",
     "@supabase/supabase-js": "^2.106.2",
     "amqplib": "^0.10.9",
     "bcryptjs": "^3.0.3",
@@ -28,7 +28,7 @@
     "pg": "^8.20.0",
     "rate-limit-redis": "^6.0.0",
     "redis": "^6.1.0",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -41,19 +41,20 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.2",
     "@types/supertest": "^7.2.1",
-    "prisma": "^7.8.0",
+    "prisma": "^7.9.0",
     "supertest": "^7.2.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "@hono/node-server": "^1.19.13"
+    "find-my-way": "^9.7.0",
+    "valibot": "^1.4.2"
   },
   "allowScripts": {
     "esbuild@0.28.1": true,
-    "prisma@7.8.0": true,
-    "@prisma/engines@7.8.0": true,
-    "sharp@0.34.5": true
+    "prisma@7.9.0": true,
+    "@prisma/engines@7.9.0": true,
+    "sharp@0.35.3": true
   }
 }

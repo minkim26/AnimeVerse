@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   retries: 0,
+  reporter: process.env.CI ? 'html' : 'list',
   webServer: {
     // Dedicated port + explicit API URL so the E2E always exercises THIS
     // worktree's AniList code against the live backend on :8000 — never the

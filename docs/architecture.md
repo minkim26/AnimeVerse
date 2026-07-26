@@ -61,6 +61,10 @@ Title   (no user association — static seed content)
 
 Auth and primary data live in Postgres via Prisma with self-issued JWTs, not Supabase Auth or Supabase's hosted Postgres. This was a deliberate choice made during the modernization rewrite to keep authentication self-contained (matching the pattern from `assignment-3-minkim26`) while still getting Supabase's managed object storage for user-uploaded avatar images and generated thumbnails — the one place in the app where real binary file storage is actually needed.
 
+## CI
+
+`.github/workflows/ci.yml` runs three jobs on every push/PR to `main`: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (starts the real Express API against the same kind of service containers, then runs the Playwright suite against a dedicated dev server on `:5174`). No job deploys anywhere — it's build/test verification only.
+
 ## Deployment status
 
-No production deployment target is configured. `.github/workflows/static.yml` predates this rewrite and only deploys to GitHub Pages, which cannot run Postgres, RabbitMQ, or the Express API — only static files. Running this stack anywhere other than local Docker Compose currently requires manually provisioning a host that can run `docker compose up` (Railway, Render, Fly.io, or a VPS) and pointing `VITE_API_URL` at it.
+No production deployment target is configured. The old `static.yml` GitHub Pages workflow is gone entirely; nothing has replaced it. Running this stack anywhere other than local Docker Compose currently requires manually provisioning a host that can run `docker compose up` (Railway, Render, Fly.io, or a VPS) and pointing `VITE_API_URL` at it.

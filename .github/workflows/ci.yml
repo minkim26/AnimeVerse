@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - run: npm test
 
   backend:
     runs-on: ubuntu-latest
@@ -76,3 +77,81 @@ jobs:
       - run: npm run build
       - run: npm run initdb
       - run: npm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: animeverse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      rabbitmq:
+        image: rabbitmq:4
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics ping"
+          --health-interval 5s
+          --health-timeout 10s
+          --health-retries 5
+    env:
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/animeverse
+      JWT_SECRET: test-secret
+      # Must match the port Playwright boots the frontend dev server on
+      # (playwright.config.ts webServer) — server.ts's cors() rejects
+      # any other origin.
+      FRONTEND_URL: http://localhost:5174
+      REDIS_URL: redis://localhost:6379
+      RABBITMQ_URL: amqp://localhost
+      SUPABASE_URL: https://fake.supabase.co
+      SUPABASE_KEY: fake-key
+      PORT: 8000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            anime-verse-backend/package-lock.json
+
+      - name: Install and start backend
+        working-directory: anime-verse-backend
+        run: |
+          npm ci
+          npm run initdb
+          npm start > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8000/health && break; sleep 1; done
+          curl -sf http://localhost:8000/health || { echo "backend never became healthy"; cat /tmp/backend.log; exit 1; }
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

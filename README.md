@@ -199,12 +199,16 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
     └── Dockerfile
 ```
 
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`, in three jobs: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against service containers, then runs the Playwright suite from the root package). None of the jobs deploy anywhere.
+
 ## Known Limitations
 
 - Watchlist and Reviews have full Prisma models and REST endpoints but no frontend UI yet — nothing in the app currently calls them.
-- No production deployment target is configured. `.github/workflows/static.yml` still deploys to GitHub Pages, which can only serve the static frontend build — it cannot run the Express API, Postgres, or RabbitMQ. A real host (Railway, Render, Fly.io, or a VPS running Docker Compose) is needed before this app can be used outside local dev.
-- The frontend has been verified via TypeScript compilation, ESLint, and production builds, but has not yet been click-tested in a browser.
+- No production deployment target is configured. There's no GitHub Pages workflow anymore (the old `static.yml` is gone) — CI only lints/builds/tests. A real host (Railway, Render, Fly.io, or a VPS running Docker Compose) is needed before this app can be used outside local dev.
+- The Playwright E2E suite drives a real signup/login and lets the browser hit AniList's actual GraphQL API — there's no mocking, so it can fail on a slow/flaky AniList response independent of app correctness.
 
 ## Deployment
 
-Not yet configured for the new stack — see **Known Limitations** above. The existing `.github/workflows/static.yml` predates this rewrite and needs to be replaced (or removed) once a real hosting target is chosen.
+Not yet configured — see **Known Limitations** above. There is no existing deploy workflow to replace; one needs to be written from scratch once a hosting target is chosen.

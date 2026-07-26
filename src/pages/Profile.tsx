@@ -270,9 +270,14 @@ export default function Profile() {
   useEffect(() => {
     getCurrentUser()
       .then(setUser)
-      .catch(() => {
-        signOut()
-        navigate('/login')
+      .catch((err) => {
+        // Only a real 401 means the session is invalid. Anything else
+        // (network hiccup, or the fetch aborting because the user navigated
+        // away before it resolved) shouldn't wipe a still-valid token.
+        if (err instanceof ApiError && err.status === 401) {
+          signOut()
+          navigate('/login')
+        }
       })
   }, [navigate])
 

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router'
 import { isAuthenticated } from '../services/auth.ts'
 
 interface ProtectedRouteProps {

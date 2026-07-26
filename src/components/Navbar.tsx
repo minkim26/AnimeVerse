@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { Sparkles, Menu, X } from 'lucide-react'
 import { isAuthenticated, signOut } from '../services/auth.ts'
 

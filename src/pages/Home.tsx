@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { ThumbsUp, Star, Clock, Shuffle } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'

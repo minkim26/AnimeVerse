@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { signUp } from '../services/auth.ts'

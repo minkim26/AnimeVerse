@@ -65,6 +65,10 @@ router.post('/', requireAuth, uploadLimiter, upload.single('file'), async (req: 
 
     if (uploadError) {
         console.error('Supabase upload error:', uploadError)
+        // No status = network-level failure; 5xx = paused/unreachable project. Both mean storage is down.
+        if ((uploadError.status ?? 500) >= 500) {
+            return res.status(503).send({ error: 'Image storage is temporarily unavailable. Please try again in a few minutes.' })
+        }
         return res.status(500).send({ error: 'Failed to store image file' })
     }
 

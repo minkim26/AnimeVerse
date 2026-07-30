@@ -51,8 +51,34 @@ async function fetchMediaList(variables: MediaListVariables): Promise<AniListAni
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query: MEDIA_LIST_QUERY, variables }),
   })
-  const json = (await response.json()) as { data: { Page: { media: AniListAnime[] } } }
-  return json.data.Page.media
+
+  // Called out separately from other non-2xx codes because it's the one
+  // failure the user can act on (wait).
+  if (response.status === 429) {
+    const retryAfter = response.headers.get('Retry-After')
+    throw new Error(
+      `AniList rate limit reached (30 requests/minute)${retryAfter ? ` — retry in ${retryAfter}s` : ''}.`,
+    )
+  }
+  if (!response.ok) {
+    throw new Error(`AniList request failed: HTTP ${response.status}`)
+  }
+
+  // GraphQL reports query-level failures as a 200 with an `errors` array and
+  // a null `data`, so this has to be checked separately from response.ok.
+  const json = (await response.json()) as {
+    data?: { Page?: { media?: AniListAnime[] } }
+    errors?: { message: string }[]
+  }
+  if (json.errors?.length) {
+    throw new Error(`AniList rejected the query: ${json.errors[0]!.message}`)
+  }
+
+  const media = json.data?.Page?.media
+  if (!media) {
+    throw new Error('AniList returned an unexpected response shape.')
+  }
+  return media
 }
 
 // ponytail: perPage: 40, page: random(1-20) covers a pool of ~800 popular

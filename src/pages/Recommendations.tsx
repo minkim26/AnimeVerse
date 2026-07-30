@@ -11,13 +11,18 @@ import {
   type AniListAnime,
 } from '../services/anilist.ts'
 
+type SectionState =
+  | { status: 'loading' }
+  | { status: 'ok'; anime: AniListAnime[] }
+  | { status: 'error'; message: string }
+
 interface AnimeSectionProps {
   title: string
-  anime: AniListAnime[] | null
+  state: SectionState
   dark?: boolean
 }
 
-function AnimeSection({ title, anime, dark }: AnimeSectionProps) {
+function AnimeSection({ title, state, dark }: AnimeSectionProps) {
   // Dynamic per-state value (muted 70% variant on the dark card) kept inline;
   // .dark-card lives in @layer components, so a plain Tailwind opacity utility
   // would compose fine here too — this is just a style choice, not a workaround.
@@ -37,13 +42,15 @@ function AnimeSection({ title, anime, dark }: AnimeSectionProps) {
           {title}
         </h2>
       </div>
-      {anime === null ? (
+      {state.status === 'loading' ? (
         <p className={mutedClass} style={mutedStyle}>Loading...</p>
-      ) : anime.length === 0 ? (
+      ) : state.status === 'error' ? (
+        <p className="text-sm text-[var(--color-error)]">{state.message}</p>
+      ) : state.anime.length === 0 ? (
         <p className={mutedClass} style={mutedStyle}>Nothing to show here yet.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-start">
-          {anime.map((a) => (
+          {state.anime.map((a) => (
             <AnimeCard key={a.id} anime={a} />
           ))}
         </div>
@@ -53,16 +60,34 @@ function AnimeSection({ title, anime, dark }: AnimeSectionProps) {
 }
 
 export default function Recommendations() {
-  const [byGenre, setByGenre] = useState<AniListAnime[] | null>(null)
-  const [trending, setTrending] = useState<AniListAnime[] | null>(null)
-  const [newReleases, setNewReleases] = useState<AniListAnime[] | null>(null)
-  const [random, setRandom] = useState<AniListAnime[] | null>(null)
+  const [byGenre, setByGenre] = useState<SectionState>({ status: 'loading' })
+  const [trending, setTrending] = useState<SectionState>({ status: 'loading' })
+  const [newReleases, setNewReleases] = useState<SectionState>({ status: 'loading' })
+  const [random, setRandom] = useState<SectionState>({ status: 'loading' })
 
   useEffect(() => {
-    getPreferences().then((genres) => fetchAnimeByGenres(genres).then(setByGenre))
-    fetchTrendingNow().then(setTrending)
-    fetchNewReleases().then(setNewReleases)
-    fetchRandomRecommendations().then(setRandom)
+    function load(
+      label: string,
+      fetcher: () => Promise<AniListAnime[]>,
+      set: (state: SectionState) => void,
+    ) {
+      fetcher()
+        .then((anime) => set({ status: 'ok', anime }))
+        .catch((err: unknown) => {
+          // Logged as well as rendered: the message tells the user what to do,
+          // the console keeps the stack/status for diagnosing it.
+          console.error(`[Recommendations] "${label}" failed to load:`, err)
+          set({
+            status: 'error',
+            message: err instanceof Error ? err.message : 'Failed to load this section.',
+          })
+        })
+    }
+
+    load('For You', () => getPreferences().then(fetchAnimeByGenres), setByGenre)
+    load('Trending Now', fetchTrendingNow, setTrending)
+    load('New Releases', fetchNewReleases, setNewReleases)
+    load('Random Recommendations', fetchRandomRecommendations, setRandom)
   }, [])
 
   return (
@@ -80,10 +105,10 @@ export default function Recommendations() {
           Click on any anime title or its image to toggle more information about it.
         </p>
 
-        <AnimeSection title="For You" anime={byGenre} dark />
-        <AnimeSection title="Trending Now" anime={trending} />
-        <AnimeSection title="New Releases" anime={newReleases} />
-        <AnimeSection title="Random Recommendations" anime={random} />
+        <AnimeSection title="For You" state={byGenre} dark />
+        <AnimeSection title="Trending Now" state={trending} />
+        <AnimeSection title="New Releases" state={newReleases} />
+        <AnimeSection title="Random Recommendations" state={random} />
       </main>
 
       <Footer />

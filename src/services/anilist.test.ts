@@ -53,6 +53,7 @@ describe('animeSynopsis', () => {
 function mockAniListResponse(media: unknown[]): Response {
   return {
     ok: true,
+    status: 200,
     json: async () => ({ data: { Page: { media } } }),
   } as Response
 }
@@ -64,6 +65,66 @@ function lastRequestVariables(fetchMock: ReturnType<typeof vi.fn>): Record<strin
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('fetchMediaList failure modes', () => {
+  it('names the rate limit and retry delay on a 429', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: { get: (h: string) => (h === 'Retry-After' ? '47' : null) },
+        json: async () => ({}),
+      } as unknown as Response),
+    )
+
+    await expect(fetchTrendingNow()).rejects.toThrow(
+      'AniList rate limit reached (30 requests/minute) — retry in 47s.',
+    )
+  })
+
+  it('surfaces a GraphQL error returned with HTTP 200', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: null, errors: [{ message: 'Invalid sort value' }] }),
+      } as unknown as Response),
+    )
+
+    await expect(fetchTrendingNow()).rejects.toThrow('AniList rejected the query: Invalid sort value')
+  })
+
+  it('reports the HTTP status for other non-2xx responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { get: () => null },
+        json: async () => ({}),
+      } as unknown as Response),
+    )
+
+    await expect(fetchTrendingNow()).rejects.toThrow('AniList request failed: HTTP 503')
+  })
+
+  it('rejects rather than throwing a TypeError on an unexpected shape', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: {} }),
+      } as unknown as Response),
+    )
+
+    await expect(fetchTrendingNow()).rejects.toThrow('AniList returned an unexpected response shape.')
+  })
 })
 
 describe('fetchAnimeByGenres', () => {

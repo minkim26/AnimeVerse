@@ -50,7 +50,7 @@ export default function Preferences() {
         </p>
 
         {loading ? (
-          <p className="text-[var(--color-muted)]">Loading...</p>
+          <p className="text-sm text-[var(--color-muted)]">Loading...</p>
         ) : (
           <form onSubmit={handleSubmit}>
             <GenreCheckboxGroup selected={genres} onChange={setGenres} />

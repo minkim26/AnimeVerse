@@ -123,7 +123,7 @@ function PasswordForm() {
           placeholder="Old Password"
           value={oldPassword}
           onChange={(e) => setOldPassword(e.target.value)}
-          className="w-full rounded-full px-5 py-2.5 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
+          className="w-full rounded-full px-5 py-3 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
         />
         <input
           type="password"
@@ -132,7 +132,7 @@ function PasswordForm() {
           placeholder="New Password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
-          className="w-full rounded-full px-5 py-2.5 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
+          className="w-full rounded-full px-5 py-3 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
         />
         <input
           type="password"
@@ -140,13 +140,13 @@ function PasswordForm() {
           placeholder="Confirm New Password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full rounded-full px-5 py-2.5 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
+          className="w-full rounded-full px-5 py-3 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
         />
 
         {message && <p className="text-xs text-[var(--color-success)]">{message}</p>}
         {error && <p className="text-xs text-[var(--color-error)]">{error}</p>}
 
-        <button type="submit" className="btn btn-accent px-6 py-2.5 text-sm">
+        <button type="submit" className="btn btn-accent px-6 py-3 text-sm">
           Update Password
         </button>
       </form>
@@ -201,7 +201,7 @@ function TitleGenerator() {
       <p className="text-sm text-[var(--color-muted)] mb-4 flex-1">
         {title ? `${title.title} — ${title.episodes} episodes` : 'Click the button to get a title.'}
       </p>
-      <button onClick={fetchTitle} className="btn btn-outline text-sm px-5 py-2 w-fit">
+      <button onClick={fetchTitle} className="btn btn-outline text-sm px-5 py-2.5 w-fit">
         Random Anime Title
       </button>
     </section>
@@ -270,7 +270,7 @@ function RandomAnimeGenerator() {
           )}
         </button>
       )}
-      <button onClick={handleRefresh} className="btn btn-outline text-sm px-5 py-2">
+      <button onClick={handleRefresh} className="btn btn-outline text-sm px-5 py-2.5">
         Random Anime Picture
       </button>
     </section>
@@ -314,7 +314,7 @@ export default function Profile() {
               Profile
             </h1>
           </div>
-          <button onClick={handleLogout} className="btn btn-outline text-sm px-5 py-2.5 shrink-0">
+          <button onClick={handleLogout} className="btn btn-accent text-sm px-5 py-2.5 shrink-0">
             Logout
           </button>
         </div>

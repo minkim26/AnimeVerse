@@ -40,13 +40,15 @@ export default function Login() {
                 Pick up right where your queue left off.
               </h2>
               <p className="text-sm opacity-80 max-w-xs">
-                Sign in to see fresh recommendations tuned to your taste.
+                Log in to see fresh recommendations tuned to your taste.
               </p>
             </div>
           </div>
 
           <div className="surface-card rounded-none p-8 sm:p-10">
-            <h1 className="font-display text-3xl font-bold mb-8 text-[var(--color-ink)]">Sign In</h1>
+            <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight mb-8 text-[var(--color-ink)]">
+              Login
+            </h1>
 
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
@@ -80,7 +82,7 @@ export default function Login() {
               {error && <p className="text-xs text-[var(--color-error)] mb-4 px-2">{error}</p>}
 
               <button type="submit" className="btn btn-accent w-full mt-2 px-6 py-3 text-sm">
-                Sign In
+                Login
               </button>
             </form>
 

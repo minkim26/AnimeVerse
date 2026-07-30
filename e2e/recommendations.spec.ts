@@ -16,7 +16,7 @@ test('signup then Recommendations page renders AniList-backed sections', async (
   await page.waitForURL('**/login')
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
-  await page.getByRole('button', { name: 'Sign In' }).click()
+  await page.getByRole('button', { name: 'Login' }).click()
 
   await page.waitForURL('**/profile')
   await page.goto('/recommendations')

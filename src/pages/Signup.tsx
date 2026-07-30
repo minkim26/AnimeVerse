@@ -46,7 +46,9 @@ export default function Signup() {
           </div>
 
           <div className="surface-card rounded-none p-8 sm:p-10">
-            <h1 className="font-display text-3xl font-bold mb-2 text-[var(--color-ink)]">Create an Account</h1>
+            <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight mb-2 text-[var(--color-ink)]">
+              Create an Account
+            </h1>
             <p className="text-sm text-[var(--color-muted)] mb-8">
               Registering allows you to access personalized anime recommendations.
             </p>

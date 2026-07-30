@@ -56,16 +56,16 @@ export default function Navbar() {
               <Link to="/profile" className={linkClass('/profile')}>
                 Profile
               </Link>
-              <button onClick={handleLogout} className="btn btn-accent px-5 py-2 text-sm">
+              <button onClick={handleLogout} className="btn btn-accent px-5 py-2.5 text-sm">
                 Logout
               </button>
             </>
           ) : (
             <>
               <Link to="/login" className={linkClass('/login')}>
-                Sign In
+                Login
               </Link>
-              <Link to="/signup" className="btn btn-accent px-5 py-2 text-sm no-underline">
+              <Link to="/signup" className="btn btn-accent px-5 py-2.5 text-sm no-underline">
                 Sign Up
               </Link>
             </>
@@ -94,18 +94,18 @@ export default function Navbar() {
               <Link to="/profile" className={mobileLinkClass('/profile')} onClick={closeMenu}>
                 Profile
               </Link>
-              <button onClick={handleLogout} className="btn btn-accent mt-3 px-5 py-2 text-sm">
+              <button onClick={handleLogout} className="btn btn-accent mt-3 px-5 py-2.5 text-sm">
                 Logout
               </button>
             </>
           ) : (
             <>
               <Link to="/login" className={mobileLinkClass('/login')} onClick={closeMenu}>
-                Sign In
+                Login
               </Link>
               <Link
                 to="/signup"
-                className="btn btn-accent mt-3 px-5 py-2 text-sm no-underline"
+                className="btn btn-accent mt-3 px-5 py-2.5 text-sm no-underline"
                 onClick={closeMenu}
               >
                 Sign Up

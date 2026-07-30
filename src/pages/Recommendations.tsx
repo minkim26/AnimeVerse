@@ -27,7 +27,7 @@ function AnimeSection({ title, state, dark }: AnimeSectionProps) {
   // .dark-card lives in @layer components, so a plain Tailwind opacity utility
   // would compose fine here too — this is just a style choice, not a workaround.
   const mutedStyle = dark ? { color: 'color-mix(in oklch, var(--color-paper) 70%, transparent)' } : undefined
-  const mutedClass = dark ? undefined : 'text-[var(--color-muted)]'
+  const mutedClass = dark ? 'text-sm' : 'text-sm text-[var(--color-muted)]'
 
   return (
     <section className={dark ? 'dark-card p-6 sm:p-8 my-10' : 'py-8'}>
@@ -45,7 +45,7 @@ function AnimeSection({ title, state, dark }: AnimeSectionProps) {
       {state.status === 'loading' ? (
         <p className={mutedClass} style={mutedStyle}>Loading...</p>
       ) : state.status === 'error' ? (
-        <p className="text-sm text-[var(--color-error)]">{state.message}</p>
+        <p className="text-xs text-[var(--color-error)]">{state.message}</p>
       ) : state.anime.length === 0 ? (
         <p className={mutedClass} style={mutedStyle}>Nothing to show here yet.</p>
       ) : (

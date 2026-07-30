@@ -27,6 +27,15 @@
   --color-accent: oklch(55% 0.21 28);
   --color-accent-hover: oklch(50% 0.21 28);
   --color-hero: oklch(26% 0.04 45);
+
+  /* Replays on keyed remount — used to crossfade a swapped-in avatar.
+     The prefers-reduced-motion reset at the end of this file neuters it. */
+  --animate-fade-in: fade-in 500ms ease-out;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 
 :root {

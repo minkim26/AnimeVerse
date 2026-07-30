@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Link } from 'react-router'
+import { Loader2 } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { getCurrentUser, signOut, updatePassword, type User } from '../services/auth.ts'
@@ -9,14 +10,15 @@ import { getPreferences } from '../services/preferences.ts'
 import { getRandomQuote, type Quote } from '../services/quotes.ts'
 import { getRandomTitle, type Title } from '../services/titles.ts'
 import { fetchRandomAnime } from '../services/anilist.ts'
-import { uploadAvatar } from '../services/avatar.ts'
+import { uploadAvatar, pollForThumbnail } from '../services/avatar.ts'
 
 interface AvatarUploadProps {
   user: User
   onUploaded: (avatarUrl: string) => void
+  onThumbnailReady: (thumbnailUrl: string) => void
 }
 
-function AvatarUpload({ user, onUploaded }: AvatarUploadProps) {
+function AvatarUpload({ user, onUploaded, onThumbnailReady }: AvatarUploadProps) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
 
@@ -37,6 +39,13 @@ function AvatarUpload({ user, onUploaded }: AvatarUploadProps) {
     }
   }
 
+  const isGeneratingThumbnail = Boolean(user.avatarUrl && !user.avatarThumbnailUrl)
+
+  useEffect(() => {
+    if (!isGeneratingThumbnail) return
+    return pollForThumbnail(getCurrentUser, onThumbnailReady)
+  }, [isGeneratingThumbnail, onThumbnailReady])
+
   const displayImage = user.avatarThumbnailUrl ?? user.avatarUrl
 
   return (
@@ -46,15 +55,20 @@ function AvatarUpload({ user, onUploaded }: AvatarUploadProps) {
       </h2>
       <div className="flex flex-wrap items-center gap-5">
         {displayImage && (
+          // key remounts the element when the src changes, replaying the fade.
           <img
+            key={displayImage}
             src={displayImage}
             alt="Profile"
-            className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover shrink-0"
+            className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover shrink-0 animate-fade-in"
           />
         )}
         <div>
-          {user.avatarUrl && !user.avatarThumbnailUrl && (
-            <p className="text-xs text-[var(--color-muted)] mb-3">Generating thumbnail...</p>
+          {isGeneratingThumbnail && (
+            <p className="flex items-center gap-1.5 text-xs text-[var(--color-muted)] mb-3">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+              Generating thumbnail...
+            </p>
           )}
           <label
             className={`btn btn-outline text-sm px-5 py-2.5 cursor-pointer${uploading ? ' opacity-60' : ''}`}
@@ -328,6 +342,7 @@ export default function Profile() {
             <AvatarUpload
               user={user}
               onUploaded={(avatarUrl) => setUser({ ...user, avatarUrl, avatarThumbnailUrl: null })}
+              onThumbnailReady={(avatarThumbnailUrl) => setUser({ ...user, avatarThumbnailUrl })}
             />
           )}
 

@@ -8,14 +8,29 @@ import Profile from './pages/Profile.tsx'
 import PrivacyPolicy from './pages/PrivacyPolicy.tsx'
 import NotFound from './pages/NotFound.tsx'
 import ProtectedRoute from './components/ProtectedRoute.tsx'
+import RedirectIfAuthenticated from './components/RedirectIfAuthenticated.tsx'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
+        <Route
+          path="/login"
+          element={
+            <RedirectIfAuthenticated>
+              <Login />
+            </RedirectIfAuthenticated>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <RedirectIfAuthenticated>
+              <Signup />
+            </RedirectIfAuthenticated>
+          }
+        />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route
           path="/preferences"

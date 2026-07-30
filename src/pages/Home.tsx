@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { ThumbsUp, Star, Clock, Shuffle } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
+import { isAuthenticated } from '../services/auth.ts'
 
 const FEATURES = [
   {
@@ -40,6 +41,8 @@ const FEATURE_LAYOUTS: { span: string; surface: string; bg?: string }[] = [
 ]
 
 export default function Home() {
+  const loggedIn = isAuthenticated()
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -61,8 +64,11 @@ export default function Home() {
               releases, and a few wildcard picks along the way.
             </p>
             <div>
-              <Link to="/signup" className="btn btn-accent px-8 py-3 text-base no-underline w-fit">
-                Get Started
+              <Link
+                to={loggedIn ? '/recommendations' : '/signup'}
+                className="btn btn-accent px-8 py-3 text-base no-underline w-fit"
+              >
+                {loggedIn ? 'View Recommendations' : 'Get Started'}
               </Link>
             </div>
           </div>
@@ -111,18 +117,28 @@ export default function Home() {
             className="font-display font-black text-[var(--color-ink)] mb-4"
             style={{ fontSize: 'var(--text-display)' }}
           >
-            Ready to find your next watch?
+            {loggedIn ? 'Ready for more?' : 'Ready to find your next watch?'}
           </h2>
           <p className="text-[var(--color-muted)] mb-8 text-lg">
-            Sign up for recommendations tuned to your taste, or sign back in to pick up where you left off.
+            {loggedIn
+              ? 'Jump back into recommendations tuned to your taste.'
+              : 'Sign up for recommendations tuned to your taste, or sign back in to pick up where you left off.'}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link to="/signup" className="btn btn-accent px-8 py-3 text-base no-underline">
-              Sign Up
-            </Link>
-            <Link to="/login" className="btn btn-outline px-8 py-3 text-base no-underline">
-              Sign In
-            </Link>
+            {loggedIn ? (
+              <Link to="/recommendations" className="btn btn-accent px-8 py-3 text-base no-underline">
+                View Recommendations
+              </Link>
+            ) : (
+              <>
+                <Link to="/signup" className="btn btn-accent px-8 py-3 text-base no-underline">
+                  Sign Up
+                </Link>
+                <Link to="/login" className="btn btn-outline px-8 py-3 text-base no-underline">
+                  Login
+                </Link>
+              </>
+            )}
           </div>
         </section>
       </main>

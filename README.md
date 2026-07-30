@@ -8,11 +8,11 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 
 ## Features
 
-- **Signup / Login** — email + password auth against the API, JWT stored in `localStorage`.
-- **Preferences** — pick favorite genres (action, comedy, fantasy, horror, mystery, romance, thriller), persisted per-user in Postgres.
-- **Recommendations** — genre-matched picks, trending-now, new releases, and a random selection, fetched directly from AniList in the browser.
-- **Profile** — change password, upload a real profile picture (async thumbnail generation), view saved preferences, and fetch a random anime, anime title, and anime quote.
-- **Auth gating** — `/preferences`, `/recommendations`, and `/profile` redirect to `/login` if no token is present (see `src/components/ProtectedRoute.tsx`).
+- **Signup / Login:** email + password auth against the API, JWT stored in `localStorage`.
+- **Preferences:** pick favorite genres (action, comedy, fantasy, horror, mystery, romance, thriller), persisted per-user in Postgres.
+- **Recommendations:** genre-matched picks, trending-now, new releases, and a random selection, fetched directly from AniList in the browser.
+- **Profile:** change password, upload a real profile picture (async thumbnail generation), view saved preferences, and fetch a random anime, anime title, and anime quote.
+- **Auth gating:** `/preferences`, `/recommendations`, and `/profile` redirect to `/login` if no token is present (see `src/components/ProtectedRoute.tsx`).
 
 ## Tech Stack
 
@@ -20,7 +20,7 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 |---|---|
 | Frontend | React 19 + Vite 7 + TypeScript, Tailwind CSS v4, react-router v8 |
 | Backend | Express 5 + TypeScript, Prisma 7 (Postgres), Zod 4 validation |
-| Auth | Self-issued JWTs (`jsonwebtoken` + `bcryptjs`) — no third-party auth provider |
+| Auth | Self-issued JWTs (`jsonwebtoken` + `bcryptjs`), not a third-party auth provider |
 | File storage | Supabase Storage (avatar originals + generated thumbnails) |
 | Async processing | RabbitMQ + a standalone `consumer.ts` worker using `sharp` for thumbnailing |
 | Caching / rate limiting | Redis (`express-rate-limit` + `rate-limit-redis` on auth/avatar endpoints, response caching on read-heavy GETs) |
@@ -58,19 +58,19 @@ Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
                                    |                     -- invalidates the cached users/me entry
 ```
 
-Recommendations and the profile page's random-anime feature call AniList directly from the browser — there is no backend proxy for that traffic, same as before the rewrite.
+Recommendations and the profile page's random-anime feature call AniList directly from the browser. No backend route proxies or caches that traffic.
 
 See [docs/architecture.md](docs/architecture.md) for a deeper breakdown of each service and [docs/avatar-upload-pipeline.md](docs/avatar-upload-pipeline.md) for the full avatar upload request lifecycle.
 
 ## Prerequisites
 
 - Node.js and npm
-- Docker and Docker Compose (recommended path — runs Postgres, RabbitMQ, and the API together)
-- A Supabase project with two public Storage buckets (`avatars`, `avatar-thumbnails`) — see [docs/supabase-setup.md](docs/supabase-setup.md) if you need to create one
+- Docker and Docker Compose (recommended: runs Postgres, RabbitMQ, and the API together)
+- A Supabase project with two public Storage buckets (`avatars`, `avatar-thumbnails`). See [docs/supabase-setup.md](docs/supabase-setup.md) if you need to create one
 
 ## Setup and Running
 
-### 1. Backend — Docker Compose (recommended)
+### 1. Backend: Docker Compose (recommended)
 
 ```bash
 cd anime-verse-backend
@@ -80,7 +80,7 @@ docker compose up
 
 This starts Postgres, RabbitMQ, the API (`:8000`), and the thumbnail consumer, and runs migrations + seeds the `Quote`/`Title` tables on first boot via the `initdb` service.
 
-### 2. Backend — local dev without Docker
+### 2. Backend: local dev without Docker
 
 ```bash
 cd anime-verse-backend
@@ -115,7 +115,7 @@ npm run dev                       # http://localhost:5173
 | `JWT_SECRET` | Signs/verifies auth JWTs. Use a long random value outside local dev. |
 | `PORT` | API listen port (defaults to `8000`). |
 | `SUPABASE_URL` | The AnimeVerse Supabase project's API URL. |
-| `SUPABASE_KEY` | Supabase **service_role** key — server-side only, never shipped to the frontend. |
+| `SUPABASE_KEY` | Supabase **service_role** key. Server-side only, never shipped to the frontend. |
 | `RABBITMQ_URL` | RabbitMQ connection string. `rabbitmq` as host inside Docker Compose, `localhost` outside it. |
 | `REDIS_URL` | Redis connection string, used for rate limiting and response caching. `redis` as host inside Docker Compose, `localhost` outside it. |
 | `FRONTEND_URL` | Origin allowed to make cross-origin requests to the API (CORS). The server refuses to start if this is unset. |
@@ -137,18 +137,18 @@ npm run dev                       # http://localhost:5173
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build locally |
 | `npm test` | Run the Vitest unit suite |
-| `npm run test:e2e` | Full Playwright suite (functional + visual regression) — needs the backend running on `:8000` |
-| `npm run test:e2e:update` | Refresh this machine's platform-specific visual-regression baselines (e.g. `-darwin` on macOS) for `e2e/visual.spec.ts` only — no backend needed |
+| `npm run test:e2e` | Full Playwright suite (functional + visual regression). Needs the backend running on `:8000` |
+| `npm run test:e2e:update` | Refresh this machine's visual-regression baselines (`-darwin` on macOS) for `e2e/visual.spec.ts` only. Runs without the backend |
 
 ### Backend (`anime-verse-backend/`)
 
 | Script | Purpose |
 |---|---|
-| `npm run dev` | `tsx watch server.ts` — restarts on file change |
+| `npm run dev` | `tsx watch server.ts`, restarts on file change |
 | `npm start` | Run the API once (used by the Docker image) |
 | `npm run initdb` | Run Prisma migrations, then seed `Quote`/`Title` from `data/*.json` |
 | `npm run build` | Type-check only (`tsc --noEmit`) |
-| `npm test` | Run the Vitest suite (`test/`, plus unit tests colocated with their source files) against a real Postgres/Redis/RabbitMQ — start those first via `docker compose up postgres redis rabbitmq initdb` |
+| `npm test` | Run the Vitest suite (`test/`, plus unit tests colocated with their source files) against a real Postgres/Redis/RabbitMQ. Start those first via `docker compose up postgres redis rabbitmq initdb` |
 
 ## API Reference
 
@@ -158,20 +158,20 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 |---|---|---|---|---|
 | POST | `/users` | | `{ email, password }` | Signup. Rate limited (10 requests / 15 min / IP). |
 | POST | `/users/login` | | `{ email, password }` | Returns `{ token }`. Rate limited (10 requests / 15 min / IP). |
-| GET | `/users/me` | ✓ | — | Current user (password field stripped). Cached in Redis for 5 min. |
+| GET | `/users/me` | ✓ | | Current user (password field stripped). Cached in Redis for 5 min. |
 | PATCH | `/users/me/password` | ✓ | `{ oldPassword, newPassword }` | Re-verifies `oldPassword` via bcrypt before updating |
-| GET | `/preferences/me` | ✓ | — | Returns `{ genres: [] }` if none saved. Cached in Redis for 5 min. |
+| GET | `/preferences/me` | ✓ | | Returns `{ genres: [] }` if none saved. Cached in Redis for 5 min. |
 | PUT | `/preferences/me` | ✓ | `{ genres: string[] }` | Full-replace upsert |
-| GET | `/watchlist` | ✓ | — | Provisioned — no frontend page consumes this yet |
+| GET | `/watchlist` | ✓ | | No frontend page consumes this yet |
 | POST | `/watchlist` | ✓ | `{ animeId, title?, posterUrl? }` | Upsert on `(userId, animeId)` |
-| DELETE | `/watchlist/:animeId` | ✓ | — | |
-| GET | `/reviews` | ✓ | — | Provisioned — no frontend page consumes this yet |
+| DELETE | `/watchlist/:animeId` | ✓ | | |
+| GET | `/reviews` | ✓ | | No frontend page consumes this yet |
 | POST | `/reviews` | ✓ | `{ animeId, rating, reviewText }` | Upsert on `(userId, animeId)` |
-| DELETE | `/reviews/:animeId` | ✓ | — | |
-| GET | `/quotes/random` | | — | `{ quote, character, anime }`. Full list cached in Redis for 1 hour. |
-| GET | `/titles/random` | | — | `{ title, episodes }`. Full list cached in Redis for 1 hour. |
+| DELETE | `/reviews/:animeId` | ✓ | | |
+| GET | `/quotes/random` | | | `{ quote, character, anime }`. Full list cached in Redis for 1 hour. |
+| GET | `/titles/random` | | | `{ title, episodes }`. Full list cached in Redis for 1 hour. |
 | POST | `/avatar` | ✓ | `multipart/form-data`, field `file` | Uploads original to Supabase, publishes a thumbnail job, returns `{ avatarUrl }`. Rate limited (20 requests / hour / user). |
-| GET | `/health` | | — | `{ status: 'ok' }` |
+| GET | `/health` | | | `{ status: 'ok' }` |
 
 ## Project Structure
 
@@ -182,7 +182,7 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 │   │                                      # Recommendations, Profile, PrivacyPolicy, NotFound
 │   ├── components/                       # Navbar, Footer, ProtectedRoute, AnimeCard, GenreCheckboxGroup
 │   ├── services/                         # api.ts (fetch wrapper), auth, preferences, anilist,
-│   │                                      # quotes, titles, avatar — one thin client per resource
+│   │                                      # quotes, titles, avatar (one client per resource)
 │   └── data/genres.ts
 ├── docs/
 │   ├── architecture.md
@@ -197,7 +197,7 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
     ├── prisma/                           # schema.prisma, migrations, seed.ts
     ├── data/                             # quotes.json, titles.json (seed source)
     ├── server.ts                         # Express app + error handler
-    ├── consumer.ts                       # RabbitMQ worker — avatar thumbnailing
+    ├── consumer.ts                       # RabbitMQ worker, avatar thumbnailing
     ├── compose.yml
     └── Dockerfile
 ```
@@ -206,14 +206,14 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 
 `.github/workflows/ci.yml` runs on every push/PR to `main`, in three jobs: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against service containers, then runs the Playwright suite from the root package). None of the jobs deploy anywhere.
 
-A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_dispatch`-only (manual trigger, never runs on push/PR) and regenerates the Linux visual-regression baselines in `e2e/visual.spec.ts-snapshots/`, opening a PR with the result. See `CLAUDE.md`'s "UI Change Workflow" section for when to run it.
+A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_dispatch`-only (manual trigger, never runs on push/PR) and regenerates the Linux visual-regression baselines in `e2e/visual.spec.ts-snapshots/`, then opens a PR with the result. See `CLAUDE.md`'s "UI Change Workflow" section for when to run it.
 
 ## Known Limitations
 
-- Watchlist and Reviews have full Prisma models and REST endpoints but no frontend UI yet — nothing in the app currently calls them.
-- No production deployment target is configured. There's no GitHub Pages workflow anymore (the old `static.yml` is gone) — CI only lints/builds/tests. A real host (Railway, Render, Fly.io, or a VPS running Docker Compose) is needed before this app can be used outside local dev.
-- The Playwright E2E suite drives a real signup/login and lets the browser hit AniList's actual GraphQL API — there's no mocking, so it can fail on a slow/flaky AniList response independent of app correctness.
+- Watchlist and Reviews have full Prisma models and REST endpoints but no frontend UI. Nothing in the app calls them.
+- No production deployment target is configured. CI only lints, builds, and tests. A host (Railway, Render, Fly.io, or a VPS running Docker Compose) is needed before the app can run outside local dev.
+- The Playwright E2E suite drives a real signup/login and lets the browser hit AniList's real GraphQL API. Nothing is mocked, so a slow AniList response can fail the suite even when the app code is correct.
 
 ## Deployment
 
-Not yet configured — see **Known Limitations** above. There is no existing deploy workflow to replace; one needs to be written from scratch once a hosting target is chosen.
+Not configured. See [Known Limitations](#known-limitations) above.

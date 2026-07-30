@@ -37,6 +37,14 @@ Auth is self-issued JWTs (`lib/auth.ts`: `generateToken`/`verifyToken`/`requireA
 - The Playwright E2E suite (`e2e/recommendations.spec.ts`) drives a real signup/login against the live backend and lets the browser hit AniList's actual GraphQL API — there's no mocking, so a slow or flaky AniList response can fail that test even when the app code is correct.
 - `update-e2e-snapshots.yml`'s `workflow_dispatch` trigger is manual-only. It does not detect stale baselines or fire automatically when a UI PR breaks visual regression — someone has to notice the `e2e` job failed and run the workflow by hand (Actions tab → "Run workflow", or `gh workflow run update-e2e-snapshots.yml`).
 
+## Writing Style
+
+Run the `/humanizer` skill on any prose written for this repo before presenting it: documentation (`README.md`, `CLAUDE.md`, `docs/*.md`), commit messages, and PR descriptions.
+
+Keep it short and keep it accurate. Less is more. A commit body is one to three short paragraphs, not a design doc, so cut any sentence that defends a decision nobody questioned. Never trade a correct detail for a smoother sentence, and if a claim isn't verified, say so or leave it out.
+
+No em dashes, no conventional-commit prefixes, no AI attribution, no emoji.
+
 ## UI Change Workflow
 
 Playwright screenshot baselines (`e2e/visual.spec.ts-snapshots/`) are pixel diffs, and Playwright auto-suffixes each filename with the OS it was captured on (`-chromium-darwin.png` vs `-chromium-linux.png`) because font rasterization differs enough between macOS and Linux to fail a cross-platform diff even with no real change. Both sets are committed: `-darwin` for local dev on a Mac, `-linux` for GitHub's Ubuntu CI runners.

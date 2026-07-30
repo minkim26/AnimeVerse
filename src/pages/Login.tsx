@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { signIn } from '../services/auth.ts'
@@ -10,13 +10,15 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const location = useLocation()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     try {
       await signIn(email, password)
-      navigate('/profile')
+      const from = location.state?.from
+      navigate(from ?? '/profile')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'An error occurred during login. Please try again later.')
     }

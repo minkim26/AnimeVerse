@@ -24,7 +24,7 @@ Auth is self-issued JWTs (`lib/auth.ts`: `generateToken`/`verifyToken`/`requireA
 
 **Orchestration** (`anime-verse-backend/compose.yml`): `api`, `consumer`, `postgres`, `rabbitmq`, `redis` (all health-checked), `initdb` (runs `prisma migrate deploy` + the seed script once, then exits). `api` and `consumer` both depend on `postgres`, `rabbitmq`, `redis`, and `initdb` completing successfully.
 
-**CI** (`.github/workflows/ci.yml`): three jobs on every push/PR to `main` — `frontend` (lint, `tsc -b` + vite build, Vitest), `backend` (`tsc --noEmit`, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against the same kind of service containers, then runs the Playwright suite against a dedicated dev server on `:5174`). None of the jobs deploy anywhere — see the quirk below. A fourth workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_dispatch`-only (never runs on push/PR) and exists solely to regenerate Linux visual-regression baselines — see "UI Change Workflow" below.
+**CI** (`.github/workflows/ci.yml`): three jobs on every push/PR to `main` — `frontend` (lint, `tsc -b` + vite build, Vitest), `backend` (`tsc --noEmit`, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against the same kind of service containers, then runs the Playwright suite against a dedicated dev server on `:5174`). None of the jobs deploy anywhere — see the quirk below. A fourth workflow, `.github/workflows/update-e2e-snapshots.yml`, exists solely to regenerate Linux visual-regression baselines — see "UI Change Workflow" below.
 
 ### Known quirks worth checking before assuming behavior
 
@@ -35,7 +35,7 @@ Auth is self-issued JWTs (`lib/auth.ts`: `generateToken`/`verifyToken`/`requireA
 - The avatar upload response returns `avatarUrl` immediately but `avatarThumbnailUrl` is only populated after the RabbitMQ consumer finishes processing — the frontend (`Profile.tsx`) shows a "Generating thumbnail..." state in the gap. Don't assume both URLs are present right after upload.
 - No production deployment target is configured. The old GitHub Pages workflow (`static.yml`) is gone entirely — `ci.yml` only lints/builds/tests, it has no deploy step. A real host (Railway, Render, Fly.io, or a VPS running Docker Compose) is still needed before this app is reachable outside local dev.
 - The Playwright E2E suite (`e2e/recommendations.spec.ts`) drives a real signup/login against the live backend and lets the browser hit AniList's actual GraphQL API — there's no mocking, so a slow or flaky AniList response can fail that test even when the app code is correct.
-- `update-e2e-snapshots.yml`'s `workflow_dispatch` trigger is manual-only. It does not detect stale baselines or fire automatically when a UI PR breaks visual regression — someone has to notice the `e2e` job failed and run the workflow by hand (Actions tab → "Run workflow", or `gh workflow run update-e2e-snapshots.yml`).
+- `update-e2e-snapshots.yml` fires automatically on push to `main` when `src/pages/**` or `src/components/**` changes, and stays available via `workflow_dispatch` for manual reruns. It requires the repo's "Allow GitHub Actions to create and approve pull requests" setting (Settings → Actions → General → Workflow permissions) to be enabled, or the PR-creation step fails even though the baseline branch pushes fine.
 
 ## Writing Style
 
@@ -55,9 +55,9 @@ Breakpoint coverage is per-page, not uniform, in `e2e/visual.spec.ts`: Home gets
 
 1. `npm run test:e2e:update` — regenerates *your* platform's baselines (macOS → `-darwin.png`) for `e2e/visual.spec.ts` only. No backend required; this command intentionally does not touch `recommendations.spec.ts` (it has no screenshots, and it needs a running backend that this command shouldn't require).
 2. `npm run test:e2e` — full suite, real backend required (`docker compose up` in `anime-verse-backend/` first). Confirms the new baselines you just wrote are what you meant, and that the functional signup/login/Recommendations flow still passes.
-3. Commit the changed `-darwin.png` files along with your code change.
-4. After pushing, manually trigger `update-e2e-snapshots.yml` (Actions tab → "Update E2E Snapshots" → "Run workflow"). It reruns `e2e/visual.spec.ts --update-snapshots` on `ubuntu-latest` and opens a PR containing only the changed `-linux.png` files — merge that PR alongside (or into) your UI change.
-5. If step 4's PR comes back empty, `peter-evans/create-pull-request` found no diff and skipped it — nothing to do.
+3. Commit the changed `-darwin.png` files along with your code change and push to `main`.
+4. The push triggers `update-e2e-snapshots.yml` automatically (path filter on `src/pages/**` and `src/components/**`). It reruns `e2e/visual.spec.ts --update-snapshots` on `ubuntu-latest` and opens a PR containing only the changed `-linux.png` files — merge that PR once it lands.
+5. If that PR comes back empty, `peter-evans/create-pull-request` found no diff and skipped it — nothing to do. If the workflow run fails at the PR-creation step, check the repo's Actions PR-creation permission (see the quirk above).
 
 Skip step 1 (and don't bother committing `-darwin.png` changes) for changes that don't touch layout — CSS/logic changes with no visual effect won't move any pixels, and `npm run test:e2e` will just pass against the existing baselines.
 

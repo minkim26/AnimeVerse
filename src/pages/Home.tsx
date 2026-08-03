@@ -32,12 +32,12 @@ const FEATURES = [
 const HERO_TILE_COLORS = ['var(--color-peach)', 'var(--color-mint)', 'var(--color-butter)', 'var(--color-sky)']
 
 // Bento sizing/surface per feature card below — deliberate size variation
-// instead of four identical cells, alternating tile-accent and surface-card.
+// (wide/narrow/narrow/wide), each tinted to match its hero tile above.
 const FEATURE_LAYOUTS: { span: string; surface: string; bg?: string }[] = [
   { span: 'col-span-6 md:col-span-4', surface: 'tile-accent', bg: 'var(--color-peach)' },
-  { span: 'col-span-6 md:col-span-2', surface: 'surface-card' },
-  { span: 'col-span-6 md:col-span-2', surface: 'tile-accent', bg: 'var(--color-sky)' },
-  { span: 'col-span-6 md:col-span-4', surface: 'surface-card' },
+  { span: 'col-span-6 md:col-span-2', surface: 'tile-accent', bg: 'var(--color-mint)' },
+  { span: 'col-span-6 md:col-span-2', surface: 'tile-accent', bg: 'var(--color-butter)' },
+  { span: 'col-span-6 md:col-span-4', surface: 'tile-accent', bg: 'var(--color-sky)' },
 ]
 
 export default function Home() {

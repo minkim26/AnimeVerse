@@ -19,35 +19,27 @@ type SectionState =
 interface AnimeSectionProps {
   title: string
   state: SectionState
-  dark?: boolean
+  tint: string
 }
 
-function AnimeSection({ title, state, dark }: AnimeSectionProps) {
-  // Dynamic per-state value (muted 70% variant on the dark card) kept inline;
-  // .dark-card lives in @layer components, so a plain Tailwind opacity utility
-  // would compose fine here too — this is just a style choice, not a workaround.
-  const mutedStyle = dark ? { color: 'color-mix(in oklch, var(--color-paper) 70%, transparent)' } : undefined
-  const mutedClass = dark ? 'text-sm' : 'text-sm text-[var(--color-muted)]'
-
+// Tinted to match this category's icon on the homepage (ThumbsUp/peach,
+// Star/mint, Clock/butter, Shuffle/sky) so the two pages read as one system.
+function AnimeSection({ title, state, tint }: AnimeSectionProps) {
   return (
-    <section className={dark ? 'dark-card p-6 sm:p-8 my-10' : 'py-8'}>
+    <section className="tile-accent p-6 sm:p-8 my-10" style={{ background: tint }}>
       <div
         className="flex items-center gap-3 mb-6 pb-3 border-b"
-        style={{ borderColor: dark ? 'color-mix(in oklch, var(--color-paper) 20%, transparent)' : 'var(--color-line)' }}
+        style={{ borderColor: 'color-mix(in oklch, var(--color-ink) 15%, transparent)' }}
       >
-        <span className="h-6 w-1.5 rounded-full shrink-0" style={{ background: 'var(--color-accent)' }} />
-        <h2
-          className={`font-display text-2xl font-semibold tracking-tight ${dark ? '' : 'text-[var(--color-ink)]'}`}
-        >
-          {title}
-        </h2>
+        <span className="h-6 w-1.5 rounded-full shrink-0" style={{ background: 'var(--color-ink)' }} />
+        <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-ink)]">{title}</h2>
       </div>
       {state.status === 'loading' ? (
-        <p className={mutedClass} style={mutedStyle}>Loading...</p>
+        <p className="text-sm text-[var(--color-muted)]">Loading...</p>
       ) : state.status === 'error' ? (
         <p className="text-xs text-[var(--color-error)]">{state.message}</p>
       ) : state.anime.length === 0 ? (
-        <p className={mutedClass} style={mutedStyle}>Nothing to show here yet.</p>
+        <p className="text-sm text-[var(--color-muted)]">Nothing to show here yet.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-start">
           {state.anime.map((a) => (
@@ -105,10 +97,10 @@ export default function Recommendations() {
           Click on any anime title or its image to toggle more information about it.
         </p>
 
-        <AnimeSection title="For You" state={byGenre} dark />
-        <AnimeSection title="Trending Now" state={trending} />
-        <AnimeSection title="New Releases" state={newReleases} />
-        <AnimeSection title="Random Recommendations" state={random} />
+        <AnimeSection title="For You" state={byGenre} tint="var(--color-peach)" />
+        <AnimeSection title="Trending Now" state={trending} tint="var(--color-mint)" />
+        <AnimeSection title="New Releases" state={newReleases} tint="var(--color-butter)" />
+        <AnimeSection title="Random Recommendations" state={random} tint="var(--color-sky)" />
       </main>
 
       <Footer />

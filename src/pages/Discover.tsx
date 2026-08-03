@@ -72,19 +72,19 @@ export default function Discover() {
         {deck.status === 'loading' && <p className="text-sm text-[var(--color-muted)]">Loading...</p>}
         {deck.status === 'error' && <p className="text-xs text-[var(--color-error)]">{deck.message}</p>}
 
+        {swipeError && <p className="text-xs text-[var(--color-error)] mb-4">{swipeError}</p>}
+
         {deck.status === 'ready' && current && (
-          <div className="surface-card w-full p-6 transition-transform duration-300">
+          <div key={current.id} className="surface-card w-full p-6">
             {current.coverImage.large && (
               <img
                 src={current.coverImage.large}
                 alt={animeTitle(current)}
-                className="w-full rounded-xl object-cover mb-4"
+                className="w-full rounded-xl object-cover aspect-[2/3] mb-4"
               />
             )}
             <h2 className="font-display text-xl font-semibold mb-2">{animeTitle(current)}</h2>
             <p className="text-sm text-[var(--color-muted)] line-clamp-6 mb-6">{animeSynopsis(current)}</p>
-
-            {swipeError && <p className="text-xs text-[var(--color-error)] mb-4">{swipeError}</p>}
 
             <div className="flex items-center justify-center gap-4">
               <button

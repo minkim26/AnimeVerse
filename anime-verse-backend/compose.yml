@@ -49,7 +49,7 @@ services:
         condition: service_completed_successfully
 
   postgres:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg18
     env_file: .env.production
     restart: unless-stopped
     ports:

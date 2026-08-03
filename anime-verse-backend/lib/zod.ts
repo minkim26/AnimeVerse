@@ -30,7 +30,7 @@ export const Review = z.object({
 export const SwipeActionValue = z.enum(['SKIP', 'LIKE', 'LOVE'])
 
 export const Swipe = z.object({
-    animeId: z.int().positive(),
+    animeId: z.int().positive().max(2_147_483_647),
     action: SwipeActionValue,
     anime: z.object({
         title: z.string().min(1).max(500),

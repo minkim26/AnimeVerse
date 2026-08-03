@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   animeTitle,
   animeSynopsis,
@@ -7,8 +7,16 @@ import {
   fetchNewReleases,
   fetchRandomRecommendations,
   fetchRandomAnime,
+  clearMediaListCache,
   type AniListAnime,
 } from './anilist.ts'
+
+// fetchTrendingNow/fetchNewReleases are cached; without this, whichever test
+// runs first would populate the cache and every later test would silently
+// get its result back instead of hitting the mocked fetch.
+beforeEach(() => {
+  clearMediaListCache()
+})
 
 function makeAnime(overrides: Partial<AniListAnime> = {}): AniListAnime {
   return {
@@ -184,6 +192,52 @@ describe('fetchNewReleases', () => {
     const variables = lastRequestVariables(fetchMock)
     expect(variables.status).toBe('RELEASING')
     expect(variables.sort).toEqual(['START_DATE_DESC'])
+  })
+})
+
+describe('fetchTrendingNow / fetchNewReleases caching', () => {
+  it('serves a second call from cache instead of refetching', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([{ id: 1 }]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const first = await fetchTrendingNow()
+    const second = await fetchTrendingNow()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(second).toEqual(first)
+  })
+
+  it('does not share a cache entry between showAdultContent values', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchTrendingNow(false)
+    await fetchTrendingNow(true)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not share a cache entry between Trending Now and New Releases', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchTrendingNow()
+    await fetchNewReleases()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('refetches once the cache entry expires', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchTrendingNow()
+    vi.advanceTimersByTime(5 * 60 * 1000 + 1)
+    await fetchTrendingNow()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
   })
 })
 

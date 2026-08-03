@@ -114,6 +114,29 @@ function randomPage(): number {
   return Math.floor(Math.random() * 20) + 1
 }
 
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+// In-memory only — resets on a hard page reload, which is fine, it exists to
+// absorb repeat SPA navigation (Recommendations -> Profile -> Recommendations),
+// not to survive a refresh. Keyed by showAdultContent too, so flipping that
+// preference naturally misses the cache instead of needing manual invalidation.
+const mediaListCache = new Map<string, { data: AniListAnime[]; expiresAt: number }>()
+
+async function cachedFetchMediaList(key: string, variables: MediaListVariables): Promise<AniListAnime[]> {
+  const cached = mediaListCache.get(key)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data
+  }
+  const data = await fetchMediaList(variables)
+  mediaListCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS })
+  return data
+}
+
+// Test-only: clears the Trending Now / New Releases cache between test cases.
+export function clearMediaListCache(): void {
+  mediaListCache.clear()
+}
+
 export async function fetchAnimeByGenres(
   genres: string[],
   showAdultContent = false,
@@ -127,8 +150,11 @@ export async function fetchAnimeByGenres(
   })
 }
 
+// Cached: this is the same data for every user at a given moment, unlike
+// fetchAnimeByGenres (personalized) or fetchRandomRecommendations (meant to
+// vary), so repeat navigation within CACHE_TTL_MS costs zero AniList requests.
 export async function fetchTrendingNow(showAdultContent = false): Promise<AniListAnime[]> {
-  return fetchMediaList({
+  return cachedFetchMediaList(`trending:${showAdultContent}`, {
     page: 1,
     perPage: 12,
     sort: ['TRENDING_DESC'],
@@ -137,7 +163,7 @@ export async function fetchTrendingNow(showAdultContent = false): Promise<AniLis
 }
 
 export async function fetchNewReleases(showAdultContent = false): Promise<AniListAnime[]> {
-  return fetchMediaList({
+  return cachedFetchMediaList(`newReleases:${showAdultContent}`, {
     page: 1,
     perPage: 12,
     status: 'RELEASING',

@@ -15,6 +15,16 @@ function makeStore(prefix: string): RedisStore {
 }
 
 /*
+ * perUserKey — keys a limiter by authenticated user, falling back to IP if
+ * req.user isn't set yet. Shared by every limiter that should cap per-user
+ * rather than per-IP.
+ */
+function perUserKey(req: Request): string {
+    const userId = (req as AuthenticatedRequest).user?.id
+    return userId ? `user:${userId}` : ipKeyGenerator(req.ip!)
+}
+
+/*
  * authLimiter — caps signup/login attempts per IP. Directly targets
  * credential-stuffing/brute-force attempts against POST /users and
  * POST /users/login.
@@ -38,10 +48,7 @@ export const uploadLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     store: makeStore('rl:upload:'),
-    keyGenerator: (req: Request): string => {
-        const userId = (req as AuthenticatedRequest).user?.id
-        return userId ? `user:${userId}` : ipKeyGenerator(req.ip!)
-    }
+    keyGenerator: perUserKey
 })
 
 /*
@@ -55,8 +62,5 @@ export const swipesLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     store: makeStore('rl:swipes:'),
-    keyGenerator: (req: Request): string => {
-        const userId = (req as AuthenticatedRequest).user?.id
-        return userId ? `user:${userId}` : ipKeyGenerator(req.ip!)
-    }
+    keyGenerator: perUserKey
 })

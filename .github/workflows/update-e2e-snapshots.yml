@@ -31,6 +31,7 @@ jobs:
       - run: npm run test:e2e:update
 
       - uses: peter-evans/create-pull-request@v7
+        id: cpr
         with:
           commit-message: Update Linux Playwright visual-regression baselines
           title: Update Linux Playwright visual-regression baselines
@@ -40,3 +41,13 @@ jobs:
           branch: update-e2e-snapshots
           delete-branch: true
           add-paths: e2e/visual.spec.ts-snapshots/**
+
+      # Requires the repo's "Allow auto-merge" setting and, to actually wait
+      # on anything, required status checks on main (frontend/backend/e2e) —
+      # without those this merges as soon as GitHub considers it mergeable,
+      # not once the PR's own CI run finishes.
+      - name: Enable auto-merge
+        if: steps.cpr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "${{ steps.cpr.outputs.pull-request-number }}"

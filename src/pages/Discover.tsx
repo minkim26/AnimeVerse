@@ -1,13 +1,46 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { Check, Heart, ThumbsUp, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Heart, ThumbsUp, X } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { getPreferences } from '../services/preferences.ts'
 import { fetchDiscoverPool, animeTitle, animeSynopsis, type AniListAnime } from '../services/anilist.ts'
-import { postSwipe, deleteSwipe, getMySwipes, type SwipeAction } from '../services/swipes.ts'
+import { postSwipe, getMySwipes, type SwipeAction } from '../services/swipes.ts'
 
 const DECK_SIZE = 20
+
+// Session-only (not localStorage): resuming across a browser restart isn't
+// the goal here, just surviving an SPA navigation away and back — the thing
+// that was actually losing progress. Cleared once a deck is finished so the
+// next visit fetches fresh candidates instead of re-showing "done" forever.
+const SESSION_KEY = 'discover:session'
+
+interface StoredSession {
+  cards: AniListAnime[]
+  index: number
+}
+
+function loadSession(): StoredSession | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    return raw ? (JSON.parse(raw) as StoredSession) : null
+  } catch {
+    return null
+  }
+}
+
+function saveSession(cards: AniListAnime[], index: number): void {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ cards, index }))
+  } catch {
+    // Storage can throw (private browsing, quota) - losing resume capability
+    // isn't worth failing the page over.
+  }
+}
+
+function clearSession(): void {
+  sessionStorage.removeItem(SESSION_KEY)
+}
 
 type DeckState =
   | { status: 'loading' }
@@ -15,14 +48,8 @@ type DeckState =
   | { status: 'ready'; cards: AniListAnime[] }
 
 // Persistent (not a toast) so the user always has an unambiguous answer to
-// "did my last swipe count" without having to guess from silence. `saved`
-// carries what's needed to undo that one swipe — only the most recent swipe
-// is ever undoable, matching a standard "sent! [undo]" pattern rather than a
-// full multi-step history.
-type SwipeStatus =
-  | { kind: 'idle' }
-  | { kind: 'saved'; undo: { anime: AniListAnime; cardIndex: number } }
-  | { kind: 'failed'; message: string }
+// "did my last swipe count" without having to guess from silence.
+type SwipeStatus = { kind: 'idle' } | { kind: 'saved' } | { kind: 'failed'; message: string }
 
 export default function Discover() {
   const [deck, setDeck] = useState<DeckState>({ status: 'loading' })
@@ -31,6 +58,12 @@ export default function Discover() {
 
   useEffect(() => {
     async function load() {
+      const saved = loadSession()
+      if (saved) {
+        setDeck({ status: 'ready', cards: saved.cards })
+        setIndex(saved.index)
+        return
+      }
       try {
         const prefs = await getPreferences().catch(() => ({ genres: [], showAdultContent: false }))
         const [pool, mySwipes] = await Promise.all([
@@ -48,11 +81,21 @@ export default function Discover() {
     load()
   }, [])
 
+  // Keeps sessionStorage in sync with progress so navigating away and back
+  // resumes instead of starting over. Clears itself once the deck is done.
+  useEffect(() => {
+    if (deck.status !== 'ready' || deck.cards.length === 0) return
+    if (index >= deck.cards.length) {
+      clearSession()
+    } else {
+      saveSession(deck.cards, index)
+    }
+  }, [deck, index])
+
   async function handleSwipe(anime: AniListAnime, action: SwipeAction) {
-    const cardIndex = index
     try {
       await postSwipe(anime, action)
-      setSwipeStatus({ kind: 'saved', undo: { anime, cardIndex } })
+      setSwipeStatus({ kind: 'saved' })
     } catch (err) {
       // A failed write only loses that one card's signal — not worth
       // blocking the deck over, but the user should know it happened.
@@ -62,15 +105,16 @@ export default function Discover() {
     setIndex((i) => i + 1)
   }
 
-  async function handleUndo(undo: { anime: AniListAnime; cardIndex: number }) {
-    try {
-      await deleteSwipe(undo.anime.id)
-      setIndex(undo.cardIndex)
-      setSwipeStatus({ kind: 'idle' })
-    } catch (err) {
-      console.error('[Discover] Failed to undo swipe:', err)
-      setSwipeStatus({ kind: 'failed', message: 'That undo may not have gone through. Try again, or refresh.' })
-    }
+  // Pure navigation, no write — re-deciding happens by pressing an action
+  // button on the revisited card, which upserts the same as any other swipe.
+  function handleBack() {
+    setSwipeStatus({ kind: 'idle' })
+    setIndex((i) => Math.max(i - 1, 0))
+  }
+
+  function handleForward() {
+    setSwipeStatus({ kind: 'idle' })
+    setIndex((i) => Math.min(i + 1, cards.length))
   }
 
   const cards = deck.status === 'ready' ? deck.cards : []
@@ -96,35 +140,50 @@ export default function Discover() {
         {deck.status === 'error' && <p className="text-xs text-[var(--color-error)]">{deck.message}</p>}
 
         {deck.status === 'ready' && cards.length > 0 && (
-          <div className="w-full mb-6">
-            <div className="flex items-center justify-between text-xs text-[var(--color-muted)] mb-1">
-              <span>
-                {swipedCount} of {cards.length} swiped
-              </span>
+          <div className="w-full mb-6 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleBack}
+              disabled={index === 0}
+              aria-label="Previous card"
+              title="Previous card"
+              className="btn btn-outline p-2 rounded-full shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowLeft size={16} />
+            </button>
+
+            <div className="flex-1">
+              <div className="flex items-center justify-between text-xs text-[var(--color-muted)] mb-1">
+                <span>
+                  {swipedCount} of {cards.length} swiped
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-[var(--color-line)] overflow-hidden">
+                <div
+                  className="h-full w-full origin-left rounded-full bg-[var(--color-accent)] transition-transform duration-300"
+                  style={{ transform: `scaleX(${swipedCount / cards.length})` }}
+                />
+              </div>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-[var(--color-line)] overflow-hidden">
-              <div
-                className="h-full w-full origin-left rounded-full bg-[var(--color-accent)] transition-transform duration-300"
-                style={{ transform: `scaleX(${swipedCount / cards.length})` }}
-              />
-            </div>
+
+            <button
+              type="button"
+              onClick={handleForward}
+              disabled={index >= cards.length}
+              aria-label="Next card"
+              title="Next card"
+              className="btn btn-outline p-2 rounded-full shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <ArrowRight size={16} />
+            </button>
           </div>
         )}
 
-        <div role="status" aria-live="polite" className="mb-4 min-h-[1.25rem] flex items-center justify-center gap-3">
+        <div role="status" aria-live="polite" className="mb-4 min-h-[1.25rem]">
           {swipeStatus.kind === 'saved' && (
-            <>
-              <p className="flex items-center gap-1.5 text-xs text-[var(--color-success)]">
-                <Check size={14} /> Saved
-              </p>
-              <button
-                type="button"
-                onClick={() => handleUndo(swipeStatus.undo)}
-                className="text-xs underline text-[var(--color-muted)] hover:text-[var(--color-ink)]"
-              >
-                Undo
-              </button>
-            </>
+            <p className="flex items-center gap-1.5 text-xs text-[var(--color-success)]">
+              <Check size={14} /> Saved
+            </p>
           )}
           {swipeStatus.kind === 'failed' && <p className="text-xs text-[var(--color-error)]">{swipeStatus.message}</p>}
         </div>
@@ -146,6 +205,7 @@ export default function Discover() {
                 type="button"
                 onClick={() => handleSwipe(current, 'SKIP')}
                 aria-label="Skip"
+                title="Skip — not interested"
                 className="btn btn-outline p-4 rounded-full"
               >
                 <X size={20} />
@@ -154,6 +214,7 @@ export default function Discover() {
                 type="button"
                 onClick={() => handleSwipe(current, 'LIKE')}
                 aria-label="Like"
+                title="Like — I'd watch this"
                 className="btn btn-outline p-4 rounded-full"
               >
                 <ThumbsUp size={20} />
@@ -162,6 +223,7 @@ export default function Discover() {
                 type="button"
                 onClick={() => handleSwipe(current, 'LOVE')}
                 aria-label="Love"
+                title="Love — one of my favorites"
                 className="btn btn-accent p-4 rounded-full"
               >
                 <Heart size={20} />

@@ -20,6 +20,9 @@ export interface AnimeCacheInput {
 export async function upsertAnime(input: AnimeCacheInput): Promise<void> {
     const vectorLiteral = `[${tagsToVector(input.tags).join(',')}]`
 
+    // ponytail: fixed 7-day staleness window, no background refresh job —
+    // good enough for a resume project. Add a scheduled refresh if the
+    // catalog needs to stay fresher than that.
     await prisma.$executeRaw`
         INSERT INTO "Anime" (id, title, "posterUrl", synopsis, tags, "tasteVector", "updatedAt")
         VALUES (${input.id}, ${input.title}, ${input.posterUrl}, ${input.synopsis}, ${JSON.stringify(input.tags)}::jsonb, ${vectorLiteral}::vector, now())

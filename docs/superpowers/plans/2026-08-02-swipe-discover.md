@@ -292,11 +292,6 @@ export interface AnimeCacheInput {
     tags: AniListTag[]
 }
 
-// ponytail: 7-day staleness window, no background refresh job — good enough
-// for a resume project. Add a scheduled refresh if the catalog needs to stay
-// fresher than that.
-const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000
-
 /*
  * upsertAnime — cache-aside write into the Anime table, called before any
  * Swipe references an animeId. Tags/tasteVector come from the caller
@@ -306,15 +301,11 @@ const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000
  * rewrite another anime's shared cached metadata on every call.
  */
 export async function upsertAnime(input: AnimeCacheInput): Promise<void> {
-    const existing = await prisma.$queryRaw<{ updatedAt: Date }[]>`
-        SELECT "updatedAt" FROM "Anime" WHERE id = ${input.id}
-    `
-    if (existing[0] && Date.now() - existing[0].updatedAt.getTime() < STALE_AFTER_MS) {
-        return
-    }
-
     const vectorLiteral = `[${tagsToVector(input.tags).join(',')}]`
 
+    // ponytail: fixed 7-day staleness window, no background refresh job —
+    // good enough for a resume project. Add a scheduled refresh if the
+    // catalog needs to stay fresher than that.
     await prisma.$executeRaw`
         INSERT INTO "Anime" (id, title, "posterUrl", synopsis, tags, "tasteVector", "updatedAt")
         VALUES (${input.id}, ${input.title}, ${input.posterUrl}, ${input.synopsis}, ${JSON.stringify(input.tags)}::jsonb, ${vectorLiteral}::vector, now())
@@ -325,9 +316,12 @@ export async function upsertAnime(input: AnimeCacheInput): Promise<void> {
             tags = EXCLUDED.tags,
             "tasteVector" = EXCLUDED."tasteVector",
             "updatedAt" = EXCLUDED."updatedAt"
+        WHERE "Anime"."updatedAt" < now() - interval '7 days'
     `
 }
 ```
+
+(This code block is copied verbatim from the current `anime-verse-backend/lib/animeCache.ts` as of the final fix wave. The original draft above used a separate `SELECT "updatedAt"` freshness check plus an unconditional `ON CONFLICT DO UPDATE`; the merged code replaced that with the single atomic statement shown here, gated by the `WHERE` clause instead of an app-level branch.)
 
 - [ ] **Step 4: Run the tests to verify they pass**
 

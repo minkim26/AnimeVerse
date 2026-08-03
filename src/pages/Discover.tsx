@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ArrowLeft, ArrowRight, Check, Heart, ThumbsUp, X } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
@@ -50,6 +51,27 @@ type DeckState =
 // Persistent (not a toast) so the user always has an unambiguous answer to
 // "did my last swipe count" without having to guess from silence.
 type SwipeStatus = { kind: 'idle' } | { kind: 'saved' } | { kind: 'failed'; message: string }
+
+interface TooltipButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  tooltip: string
+  children: ReactNode
+}
+
+// CSS-only (no JS, no library) so it doesn't depend on the browser's native
+// title-tooltip timing/support, which turned out not to be reliable enough
+// on its own for these icon-only buttons.
+function TooltipButton({ tooltip, className, children, ...buttonProps }: TooltipButtonProps) {
+  return (
+    <div className="relative group">
+      <button type="button" className={className} {...buttonProps}>
+        {children}
+      </button>
+      <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-ink)] px-2 py-1 text-xs text-[var(--color-paper)] opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-10">
+        {tooltip}
+      </span>
+    </div>
+  )
+}
 
 export default function Discover() {
   const [deck, setDeck] = useState<DeckState>({ status: 'loading' })
@@ -141,16 +163,15 @@ export default function Discover() {
 
         {deck.status === 'ready' && cards.length > 0 && (
           <div className="w-full mb-6 flex items-center gap-3">
-            <button
-              type="button"
+            <TooltipButton
+              tooltip="Previous card"
               onClick={handleBack}
               disabled={index === 0}
               aria-label="Previous card"
-              title="Previous card"
               className="btn btn-outline p-2 rounded-full shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ArrowLeft size={16} />
-            </button>
+            </TooltipButton>
 
             <div className="flex-1">
               <div className="flex items-center justify-between text-xs text-[var(--color-muted)] mb-1">
@@ -166,16 +187,15 @@ export default function Discover() {
               </div>
             </div>
 
-            <button
-              type="button"
+            <TooltipButton
+              tooltip="Next card"
               onClick={handleForward}
               disabled={index >= cards.length}
               aria-label="Next card"
-              title="Next card"
               className="btn btn-outline p-2 rounded-full shrink-0 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ArrowRight size={16} />
-            </button>
+            </TooltipButton>
           </div>
         )}
 
@@ -201,33 +221,30 @@ export default function Discover() {
             <p className="text-sm text-[var(--color-muted)] line-clamp-6 mb-6">{animeSynopsis(current)}</p>
 
             <div className="flex items-center justify-center gap-4">
-              <button
-                type="button"
+              <TooltipButton
+                tooltip="Skip — not interested"
                 onClick={() => handleSwipe(current, 'SKIP')}
                 aria-label="Skip"
-                title="Skip — not interested"
                 className="btn btn-outline p-4 rounded-full"
               >
                 <X size={20} />
-              </button>
-              <button
-                type="button"
+              </TooltipButton>
+              <TooltipButton
+                tooltip="Like — I'd watch this"
                 onClick={() => handleSwipe(current, 'LIKE')}
                 aria-label="Like"
-                title="Like — I'd watch this"
                 className="btn btn-outline p-4 rounded-full"
               >
                 <ThumbsUp size={20} />
-              </button>
-              <button
-                type="button"
+              </TooltipButton>
+              <TooltipButton
+                tooltip="Love — one of my favorites"
                 onClick={() => handleSwipe(current, 'LOVE')}
                 aria-label="Love"
-                title="Love — one of my favorites"
                 className="btn btn-accent p-4 rounded-full"
               >
                 <Heart size={20} />
-              </button>
+              </TooltipButton>
             </div>
           </div>
         )}

@@ -19,6 +19,7 @@ model User {
     preferences        Preference?
     watchlist          WatchlistItem[]
     reviews            Review[]
+    swipes             Swipe[]
 }
 
 // Preference — one row per user, full-replace semantics for their genre list.
@@ -73,4 +74,42 @@ model Title {
     id       Int    @id @default(autoincrement())
     title    String
     episodes Int
+}
+
+// Anime — cache-aside table populated whenever a Swipe references an AniList
+// id not yet cached (or stale). tasteVector is a pgvector column: Prisma's
+// generated client can't read or write Unsupported types, so lib/animeCache.ts
+// reads/writes it via $queryRaw/$executeRaw. Nullable only to satisfy
+// Prisma's migration requirement for Unsupported columns — always set via
+// raw SQL on insert.
+model Anime {
+    id          Int      @id
+    title       String
+    posterUrl   String?
+    synopsis    String
+    tags        Json
+    tasteVector Unsupported("vector(335)")?
+    updatedAt   DateTime @updatedAt
+
+    swipes Swipe[]
+}
+
+enum SwipeAction {
+    SKIP
+    LIKE
+    LOVE
+}
+
+// Swipe — one row per (user, anime) swipe decision from the Discover deck.
+// Re-swiping the same anime updates the row rather than duplicating it.
+model Swipe {
+    id        Int         @id @default(autoincrement())
+    userId    Int
+    user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    animeId   Int
+    anime     Anime       @relation(fields: [animeId], references: [id])
+    action    SwipeAction
+    createdAt DateTime    @default(now())
+
+    @@unique([userId, animeId])
 }

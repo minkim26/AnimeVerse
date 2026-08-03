@@ -9,11 +9,6 @@ export interface AnimeCacheInput {
     tags: AniListTag[]
 }
 
-// ponytail: 7-day staleness window, no background refresh job — good enough
-// for a resume project. Add a scheduled refresh if the catalog needs to stay
-// fresher than that.
-const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000
-
 /*
  * upsertAnime — cache-aside write into the Anime table, called before any
  * Swipe references an animeId. Tags/tasteVector come from the caller
@@ -23,13 +18,6 @@ const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000
  * rewrite another anime's shared cached metadata on every call.
  */
 export async function upsertAnime(input: AnimeCacheInput): Promise<void> {
-    const existing = await prisma.$queryRaw<{ updatedAt: Date }[]>`
-        SELECT "updatedAt" FROM "Anime" WHERE id = ${input.id}
-    `
-    if (existing[0] && Date.now() - existing[0].updatedAt.getTime() < STALE_AFTER_MS) {
-        return
-    }
-
     const vectorLiteral = `[${tagsToVector(input.tags).join(',')}]`
 
     await prisma.$executeRaw`
@@ -42,5 +30,6 @@ export async function upsertAnime(input: AnimeCacheInput): Promise<void> {
             tags = EXCLUDED.tags,
             "tasteVector" = EXCLUDED."tasteVector",
             "updatedAt" = EXCLUDED."updatedAt"
+        WHERE "Anime"."updatedAt" < now() - interval '7 days'
     `
 }

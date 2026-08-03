@@ -83,8 +83,8 @@ describe('GET /swipes/me', () => {
         const resB = await request(app).get('/swipes/me').set('Authorization', `Bearer ${userB.token}`).expect(200)
         expect(resB.body.swipes).toEqual([])
 
-        await prisma.anime.delete({ where: { id: animeId } }).catch(() => {})
         await userA.cleanup()
         await userB.cleanup()
+        await prisma.anime.delete({ where: { id: animeId } }).catch(() => {})
     })
 })

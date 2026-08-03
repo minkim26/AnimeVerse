@@ -20,10 +20,6 @@ Auth is self-issued JWTs (`lib/auth.ts`: `generateToken`/`verifyToken`/`requireA
 
 **Avatar upload pipeline** (async, the most complex feature in the app): `POST /avatar` uploads the original to the `avatars` Supabase Storage bucket, saves `avatarUrl` on the `User` row immediately, and publishes a message to the `avatar-thumbnails` RabbitMQ queue. A separate `consumer.ts` process (started as its own Docker Compose service, with its own `/health` on port **8001**) consumes that queue, downloads the original, resizes it to 128x128 via `sharp`, uploads the result to the `avatar-thumbnails` bucket, and writes `avatarThumbnailUrl` back via Prisma. Messages nacked without requeue route to the `avatar-thumbnails.dlq` dead-letter queue (`lib/queue.ts`) instead of being dropped. See `docs/avatar-upload-pipeline.md` for the full request lifecycle.
 
-**Data model** (`prisma/schema.prisma`): `User` (email, bcrypt `password`, `avatarUrl`, `avatarThumbnailUrl`), `Preference` (1:1 with User, `genres: String[]`), `WatchlistItem` and `Review` (both unique on `(userId, animeId)`), `Quote` and `Title` (static seed content, no user association).
-
-**Orchestration** (`anime-verse-backend/compose.yml`): `api`, `consumer`, `postgres`, `rabbitmq`, `redis` (all health-checked), `initdb` (runs `prisma migrate deploy` + the seed script once, then exits). `api` and `consumer` both depend on `postgres`, `rabbitmq`, `redis`, and `initdb` completing successfully.
-
 **CI** (`.github/workflows/ci.yml`): three jobs on every push/PR to `main` — `frontend` (lint, `tsc -b` + vite build, Vitest), `backend` (`tsc --noEmit`, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against the same kind of service containers, then runs the Playwright suite against a dedicated dev server on `:5174`). None of the jobs deploy anywhere — see the quirk below. A fourth workflow, `.github/workflows/update-e2e-snapshots.yml`, exists solely to regenerate Linux visual-regression baselines — see "UI Change Workflow" below.
 
 ### Known quirks worth checking before assuming behavior
@@ -47,19 +43,7 @@ No em dashes, no conventional-commit prefixes, no AI attribution, no emoji.
 
 ## UI Change Workflow
 
-Playwright screenshot baselines (`e2e/visual.spec.ts-snapshots/`) are pixel diffs, and Playwright auto-suffixes each filename with the OS it was captured on (`-chromium-darwin.png` vs `-chromium-linux.png`) because font rasterization differs enough between macOS and Linux to fail a cross-platform diff even with no real change. Both sets are committed: `-darwin` for local dev on a Mac, `-linux` for GitHub's Ubuntu CI runners.
-
-Breakpoint coverage is per-page, not uniform, in `e2e/visual.spec.ts`: Home gets the full 320/768/1024/1440 matrix because its bento grid actually reflows across sizes; Login, Signup, and Privacy Policy (simple forms/static text) only run at 320 and 1440, the two extremes.
-
-**When you change anything in `src/pages/` or `src/components/` that affects layout, run this sequence:**
-
-1. `npm run test:e2e:update` — regenerates *your* platform's baselines (macOS → `-darwin.png`) for `e2e/visual.spec.ts` only. No backend required; this command intentionally does not touch `recommendations.spec.ts` (it has no screenshots, and it needs a running backend that this command shouldn't require).
-2. `npm run test:e2e` — full suite, real backend required (`docker compose up` in `anime-verse-backend/` first). Confirms the new baselines you just wrote are what you meant, and that the functional signup/login/Recommendations flow still passes.
-3. Commit the changed `-darwin.png` files along with your code change and push to `main`.
-4. The push triggers `update-e2e-snapshots.yml` automatically (path filter on `src/pages/**` and `src/components/**`). It reruns `e2e/visual.spec.ts --update-snapshots` on `ubuntu-latest` and opens a PR containing only the changed `-linux.png` files — merge that PR once it lands.
-5. If that PR comes back empty, `peter-evans/create-pull-request` found no diff and skipped it — nothing to do. If the workflow run fails at the PR-creation step, check the repo's Actions PR-creation permission (see the quirk above).
-
-Skip step 1 (and don't bother committing `-darwin.png` changes) for changes that don't touch layout — CSS/logic changes with no visual effect won't move any pixels, and `npm run test:e2e` will just pass against the existing baselines.
+When you change anything in `src/pages/` or `src/components/` that affects layout, use the `ui-change-workflow` skill to regenerate and verify Playwright visual-regression baselines before committing.
 
 ## Common Commands
 

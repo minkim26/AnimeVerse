@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { ThumbsUp, Star, Clock, Shuffle } from 'lucide-react'
+import { ThumbsUp, TrendingUp, Clock, Shuffle } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { isAuthenticated } from '../services/auth.ts'
@@ -11,7 +11,7 @@ const FEATURES = [
     description: 'Get tailored anime recommendations based on your preferred genres.',
   },
   {
-    icon: Star,
+    icon: TrendingUp,
     title: 'Trending Anime',
     description: 'Stay up-to-date with the latest and most popular anime series.',
   },

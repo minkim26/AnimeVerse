@@ -15,7 +15,7 @@ function makeStore(prefix: string): RedisStore {
 }
 
 /*
- * perUserKey — keys a limiter by authenticated user, falling back to IP if
+ * perUserKey keys a limiter by authenticated user, falling back to IP if
  * req.user isn't set yet. Shared by every limiter that should cap per-user
  * rather than per-IP.
  */
@@ -52,7 +52,7 @@ export const uploadLimiter = rateLimit({
 })
 
 /*
- * swipesLimiter — caps Discover-deck swipes per authenticated user (falls
+ * swipesLimiter caps Discover-deck swipes per authenticated user (falls
  * back to IP if req.user isn't set yet). Runs after requireAuth, same
  * pattern as uploadLimiter.
  */

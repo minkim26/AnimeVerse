@@ -11,8 +11,8 @@ import { postSwipe, getMySwipes, type SwipeAction } from '../services/swipes.ts'
 const DECK_SIZE = 20
 
 // Session-only (not localStorage): resuming across a browser restart isn't
-// the goal here, just surviving an SPA navigation away and back — the thing
-// that was actually losing progress. Cleared once a deck is finished so the
+// the goal here, just surviving an SPA navigation away and back, which is
+// what was actually losing progress. Cleared once a deck is finished so the
 // next visit fetches fresh candidates instead of re-showing "done" forever.
 const SESSION_KEY = 'discover:session'
 
@@ -119,15 +119,15 @@ export default function Discover() {
       await postSwipe(anime, action)
       setSwipeStatus({ kind: 'saved' })
     } catch (err) {
-      // A failed write only loses that one card's signal — not worth
-      // blocking the deck over, but the user should know it happened.
+      // A failed write only loses that one card's signal, which isn't
+      // worth blocking the deck over, but the user should know it happened.
       console.error('[Discover] Failed to record swipe:', err)
       setSwipeStatus({ kind: 'failed', message: 'That swipe may not have been saved. Keep going, or refresh to try again.' })
     }
     setIndex((i) => i + 1)
   }
 
-  // Pure navigation, no write — re-deciding happens by pressing an action
+  // Pure navigation, no write. Re-deciding happens by pressing an action
   // button on the revisited card, which upserts the same as any other swipe.
   function handleBack() {
     setSwipeStatus({ kind: 'idle' })
@@ -222,7 +222,7 @@ export default function Discover() {
 
             <div className="flex items-center justify-center gap-4">
               <TooltipButton
-                tooltip="Skip — not interested"
+                tooltip="Skip (not interested)"
                 onClick={() => handleSwipe(current, 'SKIP')}
                 aria-label="Skip"
                 className="btn btn-outline p-4 rounded-full"
@@ -230,7 +230,7 @@ export default function Discover() {
                 <X size={20} />
               </TooltipButton>
               <TooltipButton
-                tooltip="Like — I'd watch this"
+                tooltip="Like (I'd watch this)"
                 onClick={() => handleSwipe(current, 'LIKE')}
                 aria-label="Like"
                 className="btn btn-outline p-4 rounded-full"
@@ -238,7 +238,7 @@ export default function Discover() {
                 <ThumbsUp size={20} />
               </TooltipButton>
               <TooltipButton
-                tooltip="Love — one of my favorites"
+                tooltip="Love (one of my favorites)"
                 onClick={() => handleSwipe(current, 'LOVE')}
                 aria-label="Love"
                 className="btn btn-accent p-4 rounded-full"

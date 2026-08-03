@@ -20,8 +20,8 @@ describe('upsertAnime', () => {
 
     // Canary: Task 1's migration hardcodes the "tasteVector" column as
     // vector(335) as a literal, since Postgres has no way to read
-    // VECTOR_DIMENSION from tagVector.ts. Nothing else ties them together —
-    // if data/anilistTags.json is ever regenerated with a different tag
+    // VECTOR_DIMENSION from tagVector.ts. Nothing else ties them together,
+    // so if data/anilistTags.json is ever regenerated with a different tag
     // count, this fails loudly here instead of surfacing as a Postgres
     // "different vector dimensions" error deep inside a swipe request.
     it('keeps VECTOR_DIMENSION in sync with the migration\'s hardcoded vector(335)', () => {

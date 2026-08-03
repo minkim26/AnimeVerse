@@ -2,32 +2,32 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give every user a `Swipe`-backed taste signal before recommendations exist to consume it: a pgvector-enabled `Anime` cache table keyed by AniList id, a `Swipe` model, `POST /swipes` + `GET /swipes/me`, and a `Discover` swipe-deck page that's both a mandatory post-signup step and a persistent nav tab. This plan does **not** build the taste-vector math or the recommendation query — those are roadmap #3, consuming the `Anime.tasteVector` column this plan populates.
+**Goal:** Give every user a `Swipe`-backed taste signal before recommendations exist to consume it: a pgvector-enabled `Anime` cache table keyed by AniList id, a `Swipe` model, `POST /swipes` + `GET /swipes/me`, and a `Discover` swipe-deck page that's both a mandatory post-signup step and a persistent nav tab. This plan does **not** build the taste-vector math or the recommendation query; those are roadmap #3, consuming the `Anime.tasteVector` column this plan populates.
 
-**Architecture:** `lib/tagVector.ts` (from plan #1) already converts AniList's `{name, rank}` tags into a `vector(335)` array — this plan's only new backend math is none; `lib/animeCache.ts` just calls `tagsToVector` and writes the result into Postgres via raw SQL, since `Anime.tasteVector` is a Prisma `Unsupported` type invisible to the generated client. The swipe deck's candidate pool is fetched **client-side from AniList** (`src/services/anilist.ts`, extended with one more thin fetcher, same pattern as the existing four), never server-side — see "Deviations" below for why. `POST /swipes` therefore receives the anime's title/poster/synopsis/tags in the request body (already in hand from that one client-side fetch) and caches them via `animeCache.upsertAnime` before writing the `Swipe` row.
+**Architecture:** `lib/tagVector.ts` (from plan #1) already converts AniList's `{name, rank}` tags into a `vector(335)` array, so this plan adds no new backend math there; `lib/animeCache.ts` just calls `tagsToVector` and writes the result into Postgres via raw SQL, since `Anime.tasteVector` is a Prisma `Unsupported` type invisible to the generated client. The swipe deck's candidate pool is fetched **client-side from AniList** (`src/services/anilist.ts`, extended with one more thin fetcher, same pattern as the existing four), never server-side (see "Deviations" below for why). `POST /swipes` therefore receives the anime's title/poster/synopsis/tags in the request body (already in hand from that one client-side fetch) and caches them via `animeCache.upsertAnime` before writing the `Swipe` row.
 
-**Tech Stack:** Same as plan #1 (Vitest frontend + backend, Playwright E2E, Zod, Prisma raw SQL for the `Unsupported` vector column), plus `pgvector/pgvector` as the Postgres image (replacing plain `postgres`) — no new npm dependency on either side.
+**Tech Stack:** Same as plan #1 (Vitest frontend + backend, Playwright E2E, Zod, Prisma raw SQL for the `Unsupported` vector column), plus `pgvector/pgvector` as the Postgres image (replacing plain `postgres`). No new npm dependency on either side.
 
 ## Roadmap (this plan is #2 of several)
 
-1. AniList migration — done (merged)
-2. **This plan** — pgvector + `Anime` cache table + `Swipe` model/endpoint + Discover swipe-deck UI (mandatory onboarding + persistent tab)
+1. AniList migration: done (merged)
+2. **This plan**: pgvector + `Anime` cache table + `Swipe` model/endpoint + Discover swipe-deck UI (mandatory onboarding + persistent tab)
 3. Recommendation engine (`/recommendations/for-you`) + Explore page "For You" row
 4. Explore page "Browse & Search" row (genre/sort/search against AniList directly)
-5. Watchlist/Reviews frontend ("My List") — `WatchStatus` field, FK migration to `Anime`
+5. Watchlist/Reviews frontend ("My List"): `WatchStatus` field, FK migration to `Anime`
 6. Taste Map (hand-rolled PCA) page
 7. Live activity feed + presence (WebSocket)
-8. Remove `Preference` model/page, nav update, Bento Editorial restyle — **restyle half already done** (merged); removing `Preference`/`Preferences.tsx` and the nav update are still pending
+8. Remove `Preference` model/page, nav update, Bento Editorial restyle. **Restyle half already done** (merged); removing `Preference`/`Preferences.tsx` and the nav update are still pending
 
 ## Scope & Deviations From The Design Spec
 
 The design spec (`docs/superpowers/specs/2026-07-17-resume-redesign-design.md`) describes `lib/animeCache.ts`'s `upsertAnime` as fetching from AniList itself. This plan deviates from that:
 
-- **No server-side AniList client is built.** Plan #1's Global Constraints confirmed AniList's live rate limit is **30 requests/minute**, and that no fetch function may loop multiple requests. A per-swipe server-side fetch is worse than a loop — it's one request *per user action*, and onboarding alone is ~15-20 swipes per new signup. Concurrent onboarding sessions would blow the budget in seconds. The frontend already has the full AniList payload (title, poster, synopsis, tags) in memory from the single request that loaded the swipe deck, so `POST /swipes` takes that data in its body (Zod-validated) instead. `lib/animeCache.ts` never calls AniList — it only ever receives data the client already fetched.
-- **`Preferences.tsx` and `api/preferences.ts` are untouched.** The spec frames swipe onboarding as eventually replacing the genre-checkbox Preferences page, but that removal is roadmap #8. This plan adds Discover as a new, additional flow. The swipe deck's candidate query reads the existing `showAdultContent` flag via the existing `GET /preferences/me` (already Redis-cached — no new backend work) and applies `src/services/anilist.ts`'s existing `adultContentFilter`, exactly like `Recommendations.tsx` does today. **Forward note for #8:** when `Preference`/`Preferences.tsx` are removed, `showAdultContent` needs a new home (e.g. a field on `User`, or a small settings surface) — it can't simply disappear with the model, since Discover depends on it.
+- **No server-side AniList client is built.** Plan #1's Global Constraints confirmed AniList's live rate limit is **30 requests/minute**, and that no fetch function may loop multiple requests. A per-swipe server-side fetch is worse than a loop: it's one request *per user action*, and onboarding alone is ~15-20 swipes per new signup. Concurrent onboarding sessions would blow the budget in seconds. The frontend already has the full AniList payload (title, poster, synopsis, tags) in memory from the single request that loaded the swipe deck, so `POST /swipes` takes that data in its body (Zod-validated) instead. `lib/animeCache.ts` never calls AniList; it only ever receives data the client already fetched.
+- **`Preferences.tsx` and `api/preferences.ts` are untouched.** The spec frames swipe onboarding as eventually replacing the genre-checkbox Preferences page, but that removal is roadmap #8. This plan adds Discover as a new, additional flow. The swipe deck's candidate query reads the existing `showAdultContent` flag via the existing `GET /preferences/me` (already Redis-cached, no new backend work) and applies `src/services/anilist.ts`'s existing `adultContentFilter`, exactly like `Recommendations.tsx` does today. **Forward note for #8:** when `Preference`/`Preferences.tsx` are removed, `showAdultContent` needs a new home (e.g. a field on `User`, or a small settings surface); it can't simply disappear with the model, since Discover depends on it.
 - **`Anime.tasteVector` is `vector(335)`, not the spec's provisional `vector(150)`.** Plan #1 confirmed AniList's real filtered tag vocabulary is 335 tags (`anime-verse-backend/data/anilistTags.json`, verified at plan-writing time via `node -e "console.log(JSON.parse(require('fs').readFileSync('anime-verse-backend/data/anilistTags.json')).length)"` → `335`). `Anime.tasteVector` must match `tagVector.ts`'s `VECTOR_DIMENSION` exactly, or `tagsToVector`'s output silently fails to insert.
 - **`WatchlistItem`/`Review` are not touched.** Their FK migration to `Anime` (currently `animeId String`) is roadmap #5, independently shippable, out of scope here.
-- **`POST /swipes` has a dedicated rate limiter (`swipesLimiter`, 200/hour per user).** Originally skipped in this plan on the reasoning that `POST /swipes` is "a cheap authenticated write with no comparable abuse surface" — that reasoning was sized against the `Swipe` row (user-scoped, cheap) and missed that `upsertAnime` does an unconditional `INSERT` into the shared, global `Anime` table with a client-chosen id and up to ~10KB of client-supplied data per row. The final whole-branch review caught this: one authenticated account could otherwise loop and write unbounded junk rows into that shared table. Added `swipesLimiter` in `lib/rateLimit.ts` (same per-user-keyed pattern as `uploadLimiter`), applied only to `POST /` in `api/swipes.ts` (not `GET /me`), at 200/hour — generous enough that the legitimate 15-20-swipe onboarding burst is completely unaffected.
+- **`POST /swipes` has a dedicated rate limiter (`swipesLimiter`, 200/hour per user).** Originally skipped in this plan on the reasoning that `POST /swipes` is "a cheap authenticated write with no comparable abuse surface." That reasoning was sized against the `Swipe` row (user-scoped, cheap) and missed that `upsertAnime` does an unconditional `INSERT` into the shared, global `Anime` table with a client-chosen id and up to ~10KB of client-supplied data per row. The final whole-branch review caught this: one authenticated account could otherwise loop and write unbounded junk rows into that shared table. Added `swipesLimiter` in `lib/rateLimit.ts` (same per-user-keyed pattern as `uploadLimiter`), applied only to `POST /` in `api/swipes.ts` (not `GET /me`), at 200/hour, generous enough that the legitimate 15-20-swipe onboarding burst is completely unaffected.
 
 ---
 
@@ -35,15 +35,15 @@ The design spec (`docs/superpowers/specs/2026-07-17-resume-redesign-design.md`) 
 
 Every task's requirements implicitly include this section.
 
-- **AniList's public API is rate-limited to 30 requests/minute** (per plan #1) — the swipe deck fetches its candidate pool in exactly one request per page load (mirrors `fetchRandomRecommendations`'s `perPage`/`randomPage` pattern), never per-card and never server-side.
-- **`Anime.tasteVector Unsupported("vector(335)")?` is invisible to Prisma Client** — no `.create()`, no `.update()`, no `.findMany()` field selection. All reads and writes of that column go through `prisma.$queryRaw`/`$executeRaw` in `lib/animeCache.ts`. It's nullable in the schema (not required + no `@default`) purely to satisfy Prisma's migration requirement for `Unsupported` columns — the app always sets a real value on insert via raw SQL.
-- **`CREATE EXTENSION vector` requires the `pgvector/pgvector` Postgres image**, not plain `postgres`. This must change in three places: `anime-verse-backend/compose.yml`'s `postgres` service, and the `postgres` service block in **both** the `backend` and `e2e` jobs of `.github/workflows/ci.yml` (each job defines its own inline service container — confirmed by reading the workflow, not assumed). Missing any of the three leaves that environment's migration failing on `CREATE EXTENSION vector`.
-- **`Anime` is a shared, global cache table** — unlike `Swipe`/`WatchlistItem`/`Review`, it isn't scoped to one user. `upsertAnime` only overwrites an existing row's `title`/`tags`/`tasteVector` if the row is missing or older than a 7-day staleness window, so one user's swipe can't casually overwrite another anime's cached metadata that every other user's future recommendation math will read.
-- **Client-submitted tag names outside the real 335-tag vocabulary are inert** — `tagsToVector` (plan #1) only writes a value at a tag's vocabulary index; unrecognized names contribute nothing to the vector. Combined with the staleness gate above, this bounds what a client can actually influence.
-- **Changing `src/components/Navbar.tsx` may invalidate existing Playwright visual baselines** — Navbar renders on all four pages `e2e/visual.spec.ts` snapshots (`/`, `/login`, `/signup`, `/privacy-policy`), so this must be checked. Per `CLAUDE.md`'s UI Change Workflow, any task touching `src/pages/**` or `src/components/**` must run the `ui-change-workflow` skill before committing. In practice, `e2e/visual.spec.ts` only snapshots those four pages logged out (no auth fixture — confirmed in the file itself and in `playwright.config.ts`), so a change confined to Navbar's logged-in-only branch produces a correct no-op regeneration, not a baseline diff. A change that touches the logged-out branch, or any of these pages' own markup, would move pixels and need the full regenerate-and-commit sequence. Either way, running the workflow's step 1 (`npm run test:e2e:update`) is the way to find out which case applies — don't assume.
-- **No new npm dependency.** The swipe deck is button-driven (Skip / Like / Love), not drag-gesture-based, per the spec's explicit "or equivalent buttons for accessibility/non-touch" — no gesture/animation library needed. Card-advance animation uses CSS `transform`/`opacity` only (compositor-friendly, per the web performance rules).
-- **`docker compose down` (no `-v` needed)** before the image swap takes effect locally — `compose.yml`'s `postgres` service has no volume mount, so its data is already ephemeral to the container; there's nothing to preserve.
-- **Commit messages:** plain, direct, no conventional-commit prefixes, no AI attribution — matches every prior commit in this repo.
+- **AniList's public API is rate-limited to 30 requests/minute** (per plan #1). The swipe deck fetches its candidate pool in exactly one request per page load (mirrors `fetchRandomRecommendations`'s `perPage`/`randomPage` pattern), never per-card and never server-side.
+- **`Anime.tasteVector Unsupported("vector(335)")?` is invisible to Prisma Client**: no `.create()`, no `.update()`, no `.findMany()` field selection. All reads and writes of that column go through `prisma.$queryRaw`/`$executeRaw` in `lib/animeCache.ts`. It's nullable in the schema (not required + no `@default`) purely to satisfy Prisma's migration requirement for `Unsupported` columns; the app always sets a real value on insert via raw SQL.
+- **`CREATE EXTENSION vector` requires the `pgvector/pgvector` Postgres image**, not plain `postgres`. This must change in three places: `anime-verse-backend/compose.yml`'s `postgres` service, and the `postgres` service block in **both** the `backend` and `e2e` jobs of `.github/workflows/ci.yml` (each job defines its own inline service container, confirmed by reading the workflow, not assumed). Missing any of the three leaves that environment's migration failing on `CREATE EXTENSION vector`.
+- **`Anime` is a shared, global cache table**, unlike `Swipe`/`WatchlistItem`/`Review`, which are scoped to one user. `upsertAnime` only overwrites an existing row's `title`/`tags`/`tasteVector` if the row is missing or older than a 7-day staleness window, so one user's swipe can't casually overwrite another anime's cached metadata that every other user's future recommendation math will read.
+- **Client-submitted tag names outside the real 335-tag vocabulary are inert.** `tagsToVector` (plan #1) only writes a value at a tag's vocabulary index; unrecognized names contribute nothing to the vector. Combined with the staleness gate above, this bounds what a client can actually influence.
+- **Changing `src/components/Navbar.tsx` may invalidate existing Playwright visual baselines.** Navbar renders on all four pages `e2e/visual.spec.ts` snapshots (`/`, `/login`, `/signup`, `/privacy-policy`), so this must be checked. Per `CLAUDE.md`'s UI Change Workflow, any task touching `src/pages/**` or `src/components/**` must run the `ui-change-workflow` skill before committing. In practice, `e2e/visual.spec.ts` only snapshots those four pages logged out (no auth fixture, confirmed in the file itself and in `playwright.config.ts`), so a change confined to Navbar's logged-in-only branch produces a correct no-op regeneration, not a baseline diff. A change that touches the logged-out branch, or any of these pages' own markup, would move pixels and need the full regenerate-and-commit sequence. Either way, running the workflow's step 1 (`npm run test:e2e:update`) is the way to find out which case applies; don't assume.
+- **No new npm dependency.** The swipe deck is button-driven (Skip / Like / Love), not drag-gesture-based, per the spec's explicit "or equivalent buttons for accessibility/non-touch". No gesture/animation library needed. Card-advance animation uses CSS `transform`/`opacity` only (compositor-friendly, per the web performance rules).
+- **`docker compose down` (no `-v` needed)** before the image swap takes effect locally. `compose.yml`'s `postgres` service has no volume mount, so its data is already ephemeral to the container; there's nothing to preserve.
+- **Commit messages:** plain, direct, no conventional-commit prefixes, no AI attribution, matching every prior commit in this repo.
 
 ---
 
@@ -67,11 +67,11 @@ In `anime-verse-backend/compose.yml`, change the `postgres` service:
     image: pgvector/pgvector:pg18
 ```
 
-(only the `image` line changes — healthcheck, ports, env_file, restart policy all stay as-is. Note: this plan originally used `pg17`, inferred as roughly matching what the unpinned `postgres` image it replaces would resolve to. The final whole-branch review verified that guess against the real image — `docker run --rm postgres:latest postgres --version` reports PostgreSQL 18.3 — so the plan and code both moved to `pg18` to avoid an unintended downgrade.)
+(only the `image` line changes; healthcheck, ports, env_file, restart policy all stay as-is. Note: this plan originally used `pg17`, inferred as roughly matching what the unpinned `postgres` image it replaces would resolve to. The final whole-branch review verified that guess against the real image: `docker run --rm postgres:latest postgres --version` reports PostgreSQL 18.3, so the plan and code both moved to `pg18` to avoid an unintended downgrade.)
 
 - [ ] **Step 2: Swap the Postgres image in both CI jobs**
 
-In `.github/workflows/ci.yml`, change `image: postgres` to `image: pgvector/pgvector:pg18` in **both** the `backend` job's `postgres` service and the `e2e` job's `postgres` service (two separate edits — each job declares its own service block).
+In `.github/workflows/ci.yml`, change `image: postgres` to `image: pgvector/pgvector:pg18` in **both** the `backend` job's `postgres` service and the `e2e` job's `postgres` service (two separate edits, since each job declares its own service block).
 
 - [ ] **Step 3: Add the `Anime`/`Swipe` models to the schema**
 
@@ -95,12 +95,12 @@ model User {
 Append the new models at the end of the file:
 
 ```prisma
-// Anime — cache-aside table populated whenever a Swipe references an AniList
-// id not yet cached (or stale). tasteVector is a pgvector column: Prisma's
-// generated client can't read or write Unsupported types, so lib/animeCache.ts
-// reads/writes it via $queryRaw/$executeRaw. Nullable only to satisfy
-// Prisma's migration requirement for Unsupported columns — always set via
-// raw SQL on insert.
+// Anime is a cache-aside table populated whenever a Swipe references an
+// AniList id not yet cached (or stale). tasteVector is a pgvector column:
+// Prisma's generated client can't read or write Unsupported types, so
+// lib/animeCache.ts reads/writes it via $queryRaw/$executeRaw. Nullable
+// only to satisfy Prisma's migration requirement for Unsupported columns;
+// it's always set via raw SQL on insert.
 model Anime {
     id          Int      @id
     title       String
@@ -119,8 +119,8 @@ enum SwipeAction {
     LOVE
 }
 
-// Swipe — one row per (user, anime) swipe decision from the Discover deck.
-// Re-swiping the same anime updates the row rather than duplicating it.
+// Swipe holds one row per (user, anime) swipe decision from the Discover
+// deck. Re-swiping the same anime updates the row rather than duplicating it.
 model Swipe {
     id        Int         @id @default(autoincrement())
     userId    Int
@@ -158,7 +158,7 @@ Open the generated `migration.sql` and add this as the very first line, before a
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
-This is the standard pattern for pgvector columns declared via Prisma's `Unsupported` type — Prisma has no `previewFeatures = ["postgresqlExtensions"]`-based awareness of this schema (that's a separate, newer, non-`Unsupported` mechanism this plan doesn't use, to stay consistent with the design spec's `Unsupported("vector(150)")` starting point), so nothing else will create the extension.
+This is the standard pattern for pgvector columns declared via Prisma's `Unsupported` type. Prisma has no `previewFeatures = ["postgresqlExtensions"]`-based awareness of this schema (that's a separate, newer, non-`Unsupported` mechanism this plan doesn't use, to stay consistent with the design spec's `Unsupported("vector(150)")` starting point), so nothing else will create the extension.
 
 - [ ] **Step 7: Apply the migration**
 
@@ -176,11 +176,11 @@ git add anime-verse-backend/compose.yml .github/workflows/ci.yml anime-verse-bac
 git commit -m "Switch Postgres to pgvector/pgvector and add the Anime and Swipe models"
 ```
 
-(This task has no dedicated test of its own — Task 2's integration test round-trips a real vector value through the table this migration creates, which is the actual proof the extension and column work.)
+(This task has no dedicated test of its own. Task 2's integration test round-trips a real vector value through the table this migration creates, which is the actual proof the extension and column work.)
 
 ---
 
-### Task 2: `lib/animeCache.ts` — cache-aside upsert into `Anime`
+### Task 2: `lib/animeCache.ts`: cache-aside upsert into `Anime`
 
 **Files:**
 - Create: `anime-verse-backend/lib/animeCache.ts`
@@ -217,8 +217,8 @@ describe('upsertAnime', () => {
 
     // Canary: Task 1's migration hardcodes the "tasteVector" column as
     // vector(335) as a literal, since Postgres has no way to read
-    // VECTOR_DIMENSION from tagVector.ts. Nothing else ties them together —
-    // if data/anilistTags.json is ever regenerated with a different tag
+    // VECTOR_DIMENSION from tagVector.ts. Nothing else ties them together,
+    // so if data/anilistTags.json is ever regenerated with a different tag
     // count, this fails loudly here instead of surfacing as a Postgres
     // "different vector dimensions" error deep inside a swipe request.
     it('keeps VECTOR_DIMENSION in sync with the migration\'s hardcoded vector(335)', () => {
@@ -274,7 +274,7 @@ describe('upsertAnime', () => {
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run lib/animeCache.test.ts`
-Expected: FAIL — `lib/animeCache.ts` does not exist yet.
+Expected: FAIL, since `lib/animeCache.ts` does not exist yet.
 
 - [ ] **Step 3: Implement `upsertAnime`**
 
@@ -293,18 +293,18 @@ export interface AnimeCacheInput {
 }
 
 /*
- * upsertAnime — cache-aside write into the Anime table, called before any
+ * upsertAnime is a cache-aside write into the Anime table, called before any
  * Swipe references an animeId. Tags/tasteVector come from the caller
  * (already fetched client-side from AniList when the deck loaded) rather
- * than a fresh server-side fetch — see the plan's "Deviations" section for
+ * than a fresh server-side fetch: see the plan's "Deviations" section for
  * why. Skips overwriting an already-fresh row so one user's swipe can't
  * rewrite another anime's shared cached metadata on every call.
  */
 export async function upsertAnime(input: AnimeCacheInput): Promise<void> {
     const vectorLiteral = `[${tagsToVector(input.tags).join(',')}]`
 
-    // ponytail: fixed 7-day staleness window, no background refresh job —
-    // good enough for a resume project. Add a scheduled refresh if the
+    // ponytail: fixed 7-day staleness window, no background refresh job.
+    // Good enough for a resume project. Add a scheduled refresh if the
     // catalog needs to stay fresher than that.
     await prisma.$executeRaw`
         INSERT INTO "Anime" (id, title, "posterUrl", synopsis, tags, "tasteVector", "updatedAt")
@@ -375,7 +375,7 @@ export const Swipe = z.object({
 })
 ```
 
-(Note: implementation found this needed to be `.max(100)`, not `.max(30)` as originally drafted here — live AniList data showed popular titles like One Piece carry 77 tags, so `.max(30)` would have 400'd on a meaningful fraction of the Discover deck's most popular cards. Fixed during Task 4's review; this plan text is corrected to match.)
+(Note: implementation found this needed to be `.max(100)`, not `.max(30)` as originally drafted here. Live AniList data showed popular titles like One Piece carry 77 tags, so `.max(30)` would have 400'd on a meaningful fraction of the Discover deck's most popular cards. Fixed during Task 4's review; this plan text is corrected to match.)
 
 - [ ] **Step 2: Write the failing integration tests**
 
@@ -477,7 +477,7 @@ describe('GET /swipes/me', () => {
 - [ ] **Step 3: Run the tests to verify they fail**
 
 Run: `npx vitest run api/swipes.test.ts`
-Expected: FAIL — `api/swipes.ts` does not exist yet and isn't mounted.
+Expected: FAIL, since `api/swipes.ts` does not exist yet and isn't mounted.
 
 - [ ] **Step 4: Implement the router**
 
@@ -494,10 +494,10 @@ import { upsertAnime } from '../lib/animeCache.ts'
 const router = Router()
 
 /*
- * POST /swipes — records a Discover-deck swipe decision. The request body
+ * POST /swipes records a Discover-deck swipe decision. The request body
  * carries the anime's AniList metadata (title/poster/synopsis/tags) because
  * the deck already fetched it client-side; this endpoint never calls AniList
- * itself (see the plan's "Deviations" section — a per-swipe server fetch
+ * itself (see the plan's "Deviations" section: a per-swipe server fetch
  * would blow AniList's 30 req/min limit under concurrent onboarding).
  */
 router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
@@ -521,9 +521,9 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
 })
 
 /*
- * GET /swipes/me — the caller's swipe history. Powers both the Discover
- * page's already-swiped-exclusion and the onboarding gate (redirects to
- * Discover when this list is empty).
+ * GET /swipes/me returns the caller's swipe history. Powers both the
+ * Discover page's already-swiped-exclusion and the onboarding gate
+ * (redirects to Discover when this list is empty).
  */
 router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
     const swipes = await prisma.swipe.findMany({
@@ -595,7 +595,7 @@ describe('fetchDiscoverPool', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 Run: `npx vitest run src/services/anilist.test.ts`
-Expected: FAIL — `fetchDiscoverPool` doesn't exist yet.
+Expected: FAIL, since `fetchDiscoverPool` doesn't exist yet.
 
 - [ ] **Step 3: Implement `fetchDiscoverPool`**
 
@@ -620,7 +620,7 @@ export async function fetchDiscoverPool(showAdultContent = false): Promise<AniLi
 Run: `npx vitest run src/services/anilist.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: Add the swipes service (no dedicated test — thin passthrough, matching `auth.ts`/`preferences.ts`)**
+- [ ] **Step 5: Add the swipes service (no dedicated test since it's a thin passthrough, matching `auth.ts`/`preferences.ts`)**
 
 Create `src/services/swipes.ts`:
 
@@ -730,8 +730,8 @@ export default function Discover() {
     try {
       await postSwipe(anime, action)
     } catch (err) {
-      // A failed write only loses that one card's signal — not worth
-      // blocking the deck over, but the user should know it happened.
+      // A failed write only loses that one card's signal, which isn't
+      // worth blocking the deck over, but the user should know it happened.
       console.error('[Discover] Failed to record swipe:', err)
       setSwipeError('That swipe may not have been saved. Keep going, or refresh to try again.')
     }
@@ -861,7 +861,7 @@ interface RequireOnboardingProps {
 }
 
 /*
- * RequireOnboarding — redirects to /discover if the caller has zero swipes.
+ * RequireOnboarding redirects to /discover if the caller has zero swipes.
  * Fails open (renders children) on a network error, matching this app's
  * existing pattern of defaulting rather than blocking when a personalization
  * fetch fails (see Recommendations.tsx's getPreferences().catch(...)).
@@ -925,7 +925,7 @@ In `src/components/Navbar.tsx`, add a `Discover` link before `Preferences` in **
 
 - [ ] **Step 4: Regenerate visual baselines**
 
-Run the `ui-change-workflow` skill — the Navbar change affects all four snapshotted pages (`/`, `/login`, `/signup`, `/privacy-policy`).
+Run the `ui-change-workflow` skill, since the Navbar change affects all four snapshotted pages (`/`, `/login`, `/signup`, `/privacy-policy`).
 
 - [ ] **Step 5: Verify the frontend still typechecks, lints, and builds**
 
@@ -952,7 +952,7 @@ git commit -m "Gate Recommendations behind swipe onboarding and add the Discover
 
 - [ ] **Step 1: Update the existing Recommendations test to swipe through onboarding first**
 
-`e2e/recommendations.spec.ts`'s current test signs up, logs in, then goes straight to `/recommendations` and asserts its content — that will now redirect to `/discover` for a brand-new user. Update it to swipe at least once first:
+`e2e/recommendations.spec.ts`'s current test signs up, logs in, then goes straight to `/recommendations` and asserts its content. That will now redirect to `/discover` for a brand-new user, so update it to swipe at least once first:
 
 ```ts
   await page.waitForURL('**/profile')
@@ -965,7 +965,7 @@ git commit -m "Gate Recommendations behind swipe onboarding and add the Discover
   await expect(page.getByRole('heading', { name: 'Your Top Recommendations' })).toBeVisible()
 ```
 
-(the rest of the existing assertions — Trending Now / New Releases / Random Recommendations headings, the image check — stay as they are)
+(the rest of the existing assertions, including the Trending Now / New Releases / Random Recommendations headings and the image check, stay as they are)
 
 - [ ] **Step 2: Write the Discover-specific test**
 
@@ -1035,8 +1035,8 @@ git commit -m "Update E2E coverage for the swipe onboarding gate"
 In `CLAUDE.md`'s "Known quirks worth checking before assuming behavior" section, add:
 
 ```markdown
-- Postgres runs the `pgvector/pgvector` image (not plain `postgres`), because `Anime.tasteVector` is a pgvector column (`Unsupported("vector(335)")` in `prisma/schema.prisma`) — reads/writes go through `lib/animeCache.ts`'s raw SQL, never Prisma Client directly. If you swap the compose/CI Postgres image back to plain `postgres`, `CREATE EXTENSION vector` in the migration will fail.
-- `POST /swipes` takes the anime's AniList metadata (title/poster/synopsis/tags) in its request body rather than fetching it server-side — a per-swipe AniList fetch would blow the 30 req/min limit under concurrent onboarding. Don't add a backend AniList client for this without re-checking that constraint.
+- Postgres runs the `pgvector/pgvector` image (not plain `postgres`), because `Anime.tasteVector` is a pgvector column (`Unsupported("vector(335)")` in `prisma/schema.prisma`); reads and writes go through `lib/animeCache.ts`'s raw SQL, never Prisma Client directly. If you swap the compose/CI Postgres image back to plain `postgres`, `CREATE EXTENSION vector` in the migration will fail.
+- `POST /swipes` takes the anime's AniList metadata (title/poster/synopsis/tags) in its request body instead of fetching it server-side, because a per-swipe AniList fetch would blow the 30 req/min limit under concurrent onboarding. Don't add a backend AniList client for this without re-checking that constraint.
 ```
 
 - [ ] **Step 2: Commit**
@@ -1050,10 +1050,10 @@ git commit -m "Document the pgvector image and client-supplied swipe metadata"
 
 ## Self-Review Notes
 
-- **Spec coverage:** covers roadmap item #2 in full (pgvector, `Anime` cache, `Swipe` model/endpoint, Discover UI with mandatory onboarding + persistent tab). Deliberately excludes `lib/tasteVector.ts` (user-level vector) and `/recommendations/for-you` — those consume this plan's output but belong to roadmap #3.
-- **Deviation from the design spec is explicit and justified:** `upsertAnime` takes client-supplied tags instead of fetching AniList server-side, driven by plan #1's confirmed 30 req/min limit — documented in "Scope & Deviations" and repeated as inline comments at both call sites (`lib/animeCache.ts`, `api/swipes.ts`) so a future reader doesn't "fix" it back toward the spec's original wording without re-checking the constraint that drove the change.
-- **`Preferences.tsx`/`api/preferences.ts` untouched**, per the task's explicit scope boundary — Discover only *reads* `GET /preferences/me` through the existing `getPreferences()` service, never modifies either file.
-- **`WatchlistItem`/`Review` untouched** — their FK migration to `Anime` is roadmap #5.
+- **Spec coverage:** covers roadmap item #2 in full (pgvector, `Anime` cache, `Swipe` model/endpoint, Discover UI with mandatory onboarding + persistent tab). Deliberately excludes `lib/tasteVector.ts` (user-level vector) and `/recommendations/for-you`; those consume this plan's output but belong to roadmap #3.
+- **Deviation from the design spec is explicit and justified:** `upsertAnime` takes client-supplied tags instead of fetching AniList server-side, driven by plan #1's confirmed 30 req/min limit. This is documented in "Scope & Deviations" and repeated as inline comments at both call sites (`lib/animeCache.ts`, `api/swipes.ts`) so a future reader doesn't "fix" it back toward the spec's original wording without re-checking the constraint that drove the change.
+- **`Preferences.tsx`/`api/preferences.ts` untouched**, per the task's explicit scope boundary. Discover only *reads* `GET /preferences/me` through the existing `getPreferences()` service, never modifies either file.
+- **`WatchlistItem`/`Review` untouched.** Their FK migration to `Anime` is roadmap #5.
 - **Type consistency:** `AnimeCacheInput`/`upsertAnime` defined once (Task 2), consumed only in Task 3. `fetchDiscoverPool`/`postSwipe`/`getMySwipes`/`MySwipe`/`SwipeAction` defined once (Task 4), consumed in Tasks 5-6.
-- **No placeholders:** the tag vocabulary count (335) was re-confirmed against the actual `data/anilistTags.json` file on disk while writing this plan, not assumed from plan #1's text. The `pgvector/pgvector:pg18` tag was confirmed to exist on Docker Hub, and `postgres:latest` was confirmed via `docker run --version` to actually be PostgreSQL 18.3 — the plan's initial `pg17` guess was corrected to `pg18` during the final whole-branch review once this was checked directly, rather than left as an unverified assumption.
-- **Edge case, not a bug:** if `Discover.tsx`'s AniList pool comes back with every id already in the user's swipe history (a returning user on the persistent tab, after enough sessions), `cards` is empty and the page shows the same "That's the deck for now" completion state as finishing a normal deck — there's no separate empty-pool error state, and none is needed.
+- **No placeholders:** the tag vocabulary count (335) was re-confirmed against the actual `data/anilistTags.json` file on disk while writing this plan, not assumed from plan #1's text. The `pgvector/pgvector:pg18` tag was confirmed to exist on Docker Hub, and `postgres:latest` was confirmed via `docker run --version` to actually be PostgreSQL 18.3. The plan's initial `pg17` guess was corrected to `pg18` during the final whole-branch review once this was checked directly, rather than left as an unverified assumption.
+- **Edge case, not a bug:** if `Discover.tsx`'s AniList pool comes back with every id already in the user's swipe history (a returning user on the persistent tab, after enough sessions), `cards` is empty and the page shows the same "That's the deck for now" completion state as finishing a normal deck. There's no separate empty-pool error state, and none is needed.

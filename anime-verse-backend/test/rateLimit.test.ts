@@ -97,7 +97,7 @@ describe('swipesLimiter', () => {
             const animeIds: number[] = []
 
             // 200 real requests would be slow for what's really just a
-            // wiring/keying check — pre-seed userA's counter to one below
+            // wiring/keying check, so pre-seed userA's counter to one below
             // the limit directly in Redis instead of looping.
             await redis.set(`rl:swipes:user:${userA.id}`, SWIPES_LIMIT - 1, { PX: HOUR_MS })
 

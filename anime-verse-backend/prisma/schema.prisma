@@ -76,12 +76,12 @@ model Title {
     episodes Int
 }
 
-// Anime — cache-aside table populated whenever a Swipe references an AniList
-// id not yet cached (or stale). tasteVector is a pgvector column: Prisma's
-// generated client can't read or write Unsupported types, so lib/animeCache.ts
-// reads/writes it via $queryRaw/$executeRaw. Nullable only to satisfy
-// Prisma's migration requirement for Unsupported columns — always set via
-// raw SQL on insert.
+// Anime is a cache-aside table populated whenever a Swipe references an
+// AniList id not yet cached (or stale). tasteVector is a pgvector column:
+// Prisma's generated client can't read or write Unsupported types, so
+// lib/animeCache.ts reads/writes it via $queryRaw/$executeRaw. Nullable
+// only to satisfy Prisma's migration requirement for Unsupported columns;
+// it's always set via raw SQL on insert.
 model Anime {
     id          Int      @id
     title       String
@@ -100,8 +100,8 @@ enum SwipeAction {
     LOVE
 }
 
-// Swipe — one row per (user, anime) swipe decision from the Discover deck.
-// Re-swiping the same anime updates the row rather than duplicating it.
+// Swipe holds one row per (user, anime) swipe decision from the Discover
+// deck. Re-swiping the same anime updates the row rather than duplicating it.
 model Swipe {
     id        Int         @id @default(autoincrement())
     userId    Int

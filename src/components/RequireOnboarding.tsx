@@ -10,7 +10,7 @@ interface RequireOnboardingProps {
 }
 
 /*
- * RequireOnboarding — redirects to /discover if the caller has zero swipes.
+ * RequireOnboarding redirects to /discover if the caller has zero swipes.
  * Fails open (renders children) on a network error, matching this app's
  * existing pattern of defaulting rather than blocking when a personalization
  * fetch fails (see Recommendations.tsx's getPreferences().catch(...)).

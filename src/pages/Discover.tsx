@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { getPreferences } from '../services/preferences.ts'
 import { fetchDiscoverPool, animeTitle, animeSynopsis, type AniListAnime } from '../services/anilist.ts'
-import { postSwipe, getMySwipes, type SwipeAction } from '../services/swipes.ts'
+import { postSwipe, deleteSwipe, getMySwipes, type SwipeAction } from '../services/swipes.ts'
 
 const DECK_SIZE = 20
 
@@ -15,8 +15,14 @@ type DeckState =
   | { status: 'ready'; cards: AniListAnime[] }
 
 // Persistent (not a toast) so the user always has an unambiguous answer to
-// "did my last swipe count" without having to guess from silence.
-type SwipeStatus = { kind: 'idle' } | { kind: 'saved' } | { kind: 'failed'; message: string }
+// "did my last swipe count" without having to guess from silence. `saved`
+// carries what's needed to undo that one swipe — only the most recent swipe
+// is ever undoable, matching a standard "sent! [undo]" pattern rather than a
+// full multi-step history.
+type SwipeStatus =
+  | { kind: 'idle' }
+  | { kind: 'saved'; undo: { anime: AniListAnime; cardIndex: number } }
+  | { kind: 'failed'; message: string }
 
 export default function Discover() {
   const [deck, setDeck] = useState<DeckState>({ status: 'loading' })
@@ -43,9 +49,10 @@ export default function Discover() {
   }, [])
 
   async function handleSwipe(anime: AniListAnime, action: SwipeAction) {
+    const cardIndex = index
     try {
       await postSwipe(anime, action)
-      setSwipeStatus({ kind: 'saved' })
+      setSwipeStatus({ kind: 'saved', undo: { anime, cardIndex } })
     } catch (err) {
       // A failed write only loses that one card's signal — not worth
       // blocking the deck over, but the user should know it happened.
@@ -53,6 +60,17 @@ export default function Discover() {
       setSwipeStatus({ kind: 'failed', message: 'That swipe may not have been saved. Keep going, or refresh to try again.' })
     }
     setIndex((i) => i + 1)
+  }
+
+  async function handleUndo(undo: { anime: AniListAnime; cardIndex: number }) {
+    try {
+      await deleteSwipe(undo.anime.id)
+      setIndex(undo.cardIndex)
+      setSwipeStatus({ kind: 'idle' })
+    } catch (err) {
+      console.error('[Discover] Failed to undo swipe:', err)
+      setSwipeStatus({ kind: 'failed', message: 'That undo may not have gone through. Try again, or refresh.' })
+    }
   }
 
   const cards = deck.status === 'ready' ? deck.cards : []
@@ -93,11 +111,20 @@ export default function Discover() {
           </div>
         )}
 
-        <div role="status" aria-live="polite" className="mb-4 min-h-[1.25rem]">
+        <div role="status" aria-live="polite" className="mb-4 min-h-[1.25rem] flex items-center justify-center gap-3">
           {swipeStatus.kind === 'saved' && (
-            <p className="flex items-center gap-1.5 text-xs text-[var(--color-success)]">
-              <Check size={14} /> Saved
-            </p>
+            <>
+              <p className="flex items-center gap-1.5 text-xs text-[var(--color-success)]">
+                <Check size={14} /> Saved
+              </p>
+              <button
+                type="button"
+                onClick={() => handleUndo(swipeStatus.undo)}
+                className="text-xs underline text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+              >
+                Undo
+              </button>
+            </>
           )}
           {swipeStatus.kind === 'failed' && <p className="text-xs text-[var(--color-error)]">{swipeStatus.message}</p>}
         </div>

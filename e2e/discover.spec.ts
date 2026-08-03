@@ -27,9 +27,9 @@ test('a new user is redirected to Discover before reaching Recommendations, and 
 
   await page.goto('/recommendations')
   // Asserting on rendered content rather than the URL: RequireOnboarding
-  // renders nothing while its GET /swipes/me check is in flight, so the URL
-  // reads "/recommendations" for a beat even on a run where the gate is
-  // about to redirect. The heading only appears once the gate has actually
-  // let the page through.
+  // shows a brief loading shell while its GET /swipes/me check is in
+  // flight, so the URL reads "/recommendations" for a beat even on a run
+  // where the gate is about to redirect. The heading only appears once the
+  // gate has actually let the page through.
   await expect(page.getByRole('heading', { name: 'Your Top Recommendations' })).toBeVisible()
 })

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router'
+import Navbar from './Navbar.tsx'
+import Footer from './Footer.tsx'
 import { getMySwipes } from '../services/swipes.ts'
 
 interface RequireOnboardingProps {
@@ -22,7 +24,17 @@ export default function RequireOnboarding({ children }: RequireOnboardingProps) 
       .catch(() => setStatus('onboarded'))
   }, [])
 
-  if (status === 'checking') return null
+  if (status === 'checking') {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 max-w-xl mx-auto px-4 py-12 w-full">
+          <p className="text-sm text-[var(--color-muted)]">Loading...</p>
+        </main>
+        <Footer />
+      </div>
+    )
+  }
   if (status === 'needs-onboarding') return <Navigate to="/discover" replace />
   return children
 }

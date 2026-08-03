@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
-import { Heart, ThumbsUp, X } from 'lucide-react'
+import { Check, Heart, ThumbsUp, X } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { getPreferences } from '../services/preferences.ts'
@@ -14,10 +14,14 @@ type DeckState =
   | { status: 'error'; message: string }
   | { status: 'ready'; cards: AniListAnime[] }
 
+// Persistent (not a toast) so the user always has an unambiguous answer to
+// "did my last swipe count" without having to guess from silence.
+type SwipeStatus = { kind: 'idle' } | { kind: 'saved' } | { kind: 'failed'; message: string }
+
 export default function Discover() {
   const [deck, setDeck] = useState<DeckState>({ status: 'loading' })
   const [index, setIndex] = useState(0)
-  const [swipeError, setSwipeError] = useState('')
+  const [swipeStatus, setSwipeStatus] = useState<SwipeStatus>({ kind: 'idle' })
 
   useEffect(() => {
     async function load() {
@@ -39,20 +43,21 @@ export default function Discover() {
   }, [])
 
   async function handleSwipe(anime: AniListAnime, action: SwipeAction) {
-    setSwipeError('')
     try {
       await postSwipe(anime, action)
+      setSwipeStatus({ kind: 'saved' })
     } catch (err) {
       // A failed write only loses that one card's signal — not worth
       // blocking the deck over, but the user should know it happened.
       console.error('[Discover] Failed to record swipe:', err)
-      setSwipeError('That swipe may not have been saved. Keep going, or refresh to try again.')
+      setSwipeStatus({ kind: 'failed', message: 'That swipe may not have been saved. Keep going, or refresh to try again.' })
     }
     setIndex((i) => i + 1)
   }
 
   const cards = deck.status === 'ready' ? deck.cards : []
   const current = cards[index]
+  const swipedCount = Math.min(index, cards.length)
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -72,7 +77,30 @@ export default function Discover() {
         {deck.status === 'loading' && <p className="text-sm text-[var(--color-muted)]">Loading...</p>}
         {deck.status === 'error' && <p className="text-xs text-[var(--color-error)]">{deck.message}</p>}
 
-        {swipeError && <p className="text-xs text-[var(--color-error)] mb-4">{swipeError}</p>}
+        {deck.status === 'ready' && cards.length > 0 && (
+          <div className="w-full mb-6">
+            <div className="flex items-center justify-between text-xs text-[var(--color-muted)] mb-1">
+              <span>
+                {swipedCount} of {cards.length} swiped
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-[var(--color-line)] overflow-hidden">
+              <div
+                className="h-full w-full origin-left rounded-full bg-[var(--color-accent)] transition-transform duration-300"
+                style={{ transform: `scaleX(${swipedCount / cards.length})` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div role="status" aria-live="polite" className="mb-4 min-h-[1.25rem]">
+          {swipeStatus.kind === 'saved' && (
+            <p className="flex items-center gap-1.5 text-xs text-[var(--color-success)]">
+              <Check size={14} /> Saved
+            </p>
+          )}
+          {swipeStatus.kind === 'failed' && <p className="text-xs text-[var(--color-error)]">{swipeStatus.message}</p>}
+        </div>
 
         {deck.status === 'ready' && current && (
           <div key={current.id} className="surface-card w-full p-6">

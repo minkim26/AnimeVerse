@@ -47,6 +47,9 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-6">
           {loggedIn ? (
             <>
+              <Link to="/discover" className={linkClass('/discover')}>
+                Discover
+              </Link>
               <Link to="/preferences" className={linkClass('/preferences')}>
                 Preferences
               </Link>
@@ -85,6 +88,9 @@ export default function Navbar() {
         <div className="md:hidden absolute top-full left-0 right-0 bg-[var(--color-surface)] border-b border-[var(--color-line)] shadow-lg px-6 py-4 flex flex-col z-10">
           {loggedIn ? (
             <>
+              <Link to="/discover" className={mobileLinkClass('/discover')} onClick={closeMenu}>
+                Discover
+              </Link>
               <Link to="/preferences" className={mobileLinkClass('/preferences')} onClick={closeMenu}>
                 Preferences
               </Link>

@@ -7,8 +7,10 @@ import Recommendations from './pages/Recommendations.tsx'
 import Profile from './pages/Profile.tsx'
 import PrivacyPolicy from './pages/PrivacyPolicy.tsx'
 import NotFound from './pages/NotFound.tsx'
+import Discover from './pages/Discover.tsx'
 import ProtectedRoute from './components/ProtectedRoute.tsx'
 import RedirectIfAuthenticated from './components/RedirectIfAuthenticated.tsx'
+import RequireOnboarding from './components/RequireOnboarding.tsx'
 
 export default function App() {
   return (
@@ -41,10 +43,20 @@ export default function App() {
           }
         />
         <Route
+          path="/discover"
+          element={
+            <ProtectedRoute>
+              <Discover />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/recommendations"
           element={
             <ProtectedRoute>
-              <Recommendations />
+              <RequireOnboarding>
+                <Recommendations />
+              </RequireOnboarding>
             </ProtectedRoute>
           }
         />

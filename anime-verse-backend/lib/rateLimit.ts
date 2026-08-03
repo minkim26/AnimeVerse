@@ -43,3 +43,20 @@ export const uploadLimiter = rateLimit({
         return userId ? `user:${userId}` : ipKeyGenerator(req.ip!)
     }
 })
+
+/*
+ * swipesLimiter — caps Discover-deck swipes per authenticated user (falls
+ * back to IP if req.user isn't set yet). Runs after requireAuth, same
+ * pattern as uploadLimiter.
+ */
+export const swipesLimiter = rateLimit({
+    windowMs: 60 * MINUTE,
+    limit: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    store: makeStore('rl:swipes:'),
+    keyGenerator: (req: Request): string => {
+        const userId = (req as AuthenticatedRequest).user?.id
+        return userId ? `user:${userId}` : ipKeyGenerator(req.ip!)
+    }
+})

@@ -3,6 +3,7 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.ts'
 import { Swipe } from '../lib/zod.ts'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.ts'
+import { swipesLimiter } from '../lib/rateLimit.ts'
 import { upsertAnime } from '../lib/animeCache.ts'
 
 const router = Router()
@@ -14,7 +15,7 @@ const router = Router()
  * itself (see the plan's "Deviations" section — a per-swipe server fetch
  * would blow AniList's 30 req/min limit under concurrent onboarding).
  */
-router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
+router.post('/', requireAuth, swipesLimiter, async (req: AuthenticatedRequest, res) => {
     const data = Swipe.parse(req.body)
 
     await upsertAnime({

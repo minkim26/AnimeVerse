@@ -7,6 +7,7 @@ import {
   fetchNewReleases,
   fetchRandomRecommendations,
   fetchRandomAnime,
+  fetchDiscoverPool,
   clearMediaListCache,
   type AniListAnime,
 } from './anilist.ts'
@@ -287,5 +288,18 @@ describe('fetchRandomAnime', () => {
     const result = await fetchRandomAnime()
 
     expect(result.imageUrl).toBe('large.jpg')
+  })
+})
+
+describe('fetchDiscoverPool', () => {
+  it('makes exactly one request and returns up to 50 results', async () => {
+    const pool = Array.from({ length: 50 }, (_, i) => ({ id: i }))
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse(pool))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchDiscoverPool()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result).toHaveLength(50)
   })
 })

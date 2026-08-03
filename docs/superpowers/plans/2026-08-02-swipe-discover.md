@@ -376,10 +376,12 @@ export const Swipe = z.object({
                     rank: z.number().min(0).max(100)
                 })
             )
-            .max(30)
+            .max(100)
     })
 })
 ```
+
+(Note: implementation found this needed to be `.max(100)`, not `.max(30)` as originally drafted here — live AniList data showed popular titles like One Piece carry 77 tags, so `.max(30)` would have 400'd on a meaningful fraction of the Discover deck's most popular cards. Fixed during Task 4's review; this plan text is corrected to match.)
 
 - [ ] **Step 2: Write the failing integration tests**
 

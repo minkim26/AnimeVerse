@@ -207,24 +207,15 @@ describe('fetchTrendingNow / fetchNewReleases caching', () => {
     expect(second).toEqual(first)
   })
 
-  it('does not share a cache entry between showAdultContent values', async () => {
+  it('does not share a cache entry across showAdultContent values or sections', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
     vi.stubGlobal('fetch', fetchMock)
 
     await fetchTrendingNow(false)
     await fetchTrendingNow(true)
+    await fetchNewReleases(false)
 
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-  })
-
-  it('does not share a cache entry between Trending Now and New Releases', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await fetchTrendingNow()
-    await fetchNewReleases()
-
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
   it('refetches once the cache entry expires', async () => {

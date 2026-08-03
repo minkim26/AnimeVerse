@@ -29,7 +29,3 @@ export async function getMySwipes(): Promise<MySwipe[]> {
   const { swipes } = await apiRequest<{ swipes: MySwipe[] }>('/swipes/me', { auth: true })
   return swipes
 }
-
-export async function deleteSwipe(animeId: number): Promise<void> {
-  await apiRequest(`/swipes/${animeId}`, { method: 'DELETE', auth: true })
-}

@@ -48,26 +48,4 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
     res.status(200).send({ swipes })
 })
 
-/*
- * DELETE /swipes/:animeId — undoes a swipe. Scoped to the caller by
- * deleting on the [userId, animeId] compound key rather than animeId alone,
- * so a swipe can only ever be deleted by the user who made it — deleting
- * another user's swipe (or one that doesn't exist) misses the key and
- * surfaces as the same P2025 -> 404 the centralized error handler already
- * maps, with no bespoke ownership check needed.
- */
-router.delete('/:animeId', requireAuth, async (req: AuthenticatedRequest, res) => {
-    const animeId = Number(req.params.animeId)
-    if (!Number.isInteger(animeId)) {
-        res.status(400).send({ error: 'animeId must be an integer' })
-        return
-    }
-
-    await prisma.swipe.delete({
-        where: { userId_animeId: { userId: req.user!.id, animeId } }
-    })
-
-    res.status(204).send()
-})
-
 export default router

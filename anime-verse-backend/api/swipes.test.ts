@@ -88,3 +88,50 @@ describe('GET /swipes/me', () => {
         await prisma.anime.delete({ where: { id: animeId } }).catch(() => {})
     })
 })
+
+describe('DELETE /swipes/:animeId', () => {
+    it('requires authentication', async () => {
+        const res = await request(app).delete(`/swipes/${randomAnimeId()}`)
+        expect(res.status).toBe(401)
+    })
+
+    it("removes the caller's swipe, undoing it", async () => {
+        const user = await createTestUser(app)
+        const animeId = randomAnimeId()
+
+        await request(app).post('/swipes').set('Authorization', `Bearer ${user.token}`).send(swipeBody(animeId, 'LOVE')).expect(201)
+
+        await request(app).delete(`/swipes/${animeId}`).set('Authorization', `Bearer ${user.token}`).expect(204)
+
+        const mine = await request(app).get('/swipes/me').set('Authorization', `Bearer ${user.token}`).expect(200)
+        expect(mine.body.swipes).toEqual([])
+
+        await user.cleanup()
+        await prisma.anime.delete({ where: { id: animeId } }).catch(() => {})
+    })
+
+    it("cannot delete another user's swipe", async () => {
+        const userA = await createTestUser(app)
+        const userB = await createTestUser(app)
+        const animeId = randomAnimeId()
+
+        await request(app).post('/swipes').set('Authorization', `Bearer ${userA.token}`).send(swipeBody(animeId, 'LIKE')).expect(201)
+
+        await request(app).delete(`/swipes/${animeId}`).set('Authorization', `Bearer ${userB.token}`).expect(404)
+
+        const mine = await request(app).get('/swipes/me').set('Authorization', `Bearer ${userA.token}`).expect(200)
+        expect(mine.body.swipes).toEqual([{ animeId, action: 'LIKE' }])
+
+        await userA.cleanup()
+        await userB.cleanup()
+        await prisma.anime.delete({ where: { id: animeId } }).catch(() => {})
+    })
+
+    it('returns 404 for a swipe that does not exist', async () => {
+        const user = await createTestUser(app)
+
+        await request(app).delete(`/swipes/${randomAnimeId()}`).set('Authorization', `Bearer ${user.token}`).expect(404)
+
+        await user.cleanup()
+    })
+})

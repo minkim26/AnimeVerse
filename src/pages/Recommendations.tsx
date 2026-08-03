@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChevronDown, ChevronUp, Maximize2, Minimize2 } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import AnimeCard from '../components/AnimeCard.tsx'
@@ -11,6 +12,8 @@ import {
   type AniListAnime,
 } from '../services/anilist.ts'
 
+const COLLAPSED_COUNT = 4
+
 type SectionState =
   | { status: 'loading' }
   | { status: 'ok'; anime: AniListAnime[] }
@@ -20,29 +23,57 @@ interface AnimeSectionProps {
   title: string
   state: SectionState
   tint: string
+  expanded: boolean
+  onToggleExpanded: () => void
 }
 
 // Tinted to match this category's icon on the homepage (ThumbsUp/peach,
 // Star/mint, Clock/butter, Shuffle/sky) so the two pages read as one system.
-function AnimeSection({ title, state, tint }: AnimeSectionProps) {
+function AnimeSection({ title, state, tint, expanded, onToggleExpanded }: AnimeSectionProps) {
+  const anime = state.status === 'ok' ? state.anime : []
+  const visible = expanded ? anime : anime.slice(0, COLLAPSED_COUNT)
+  const canToggle = anime.length > COLLAPSED_COUNT
+
   return (
     <section className="tile-accent p-6 sm:p-8 my-10" style={{ background: tint }}>
       <div
-        className="flex items-center gap-3 mb-6 pb-3 border-b"
+        className="flex items-center justify-between gap-3 mb-6 pb-3 border-b"
         style={{ borderColor: 'color-mix(in oklch, var(--color-ink) 15%, transparent)' }}
       >
-        <span className="h-6 w-1.5 rounded-full shrink-0" style={{ background: 'var(--color-ink)' }} />
-        <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-ink)]">{title}</h2>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="h-6 w-1.5 rounded-full shrink-0" style={{ background: 'var(--color-ink)' }} />
+          <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-ink)] truncate">
+            {title}
+          </h2>
+        </div>
+        {canToggle && (
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            aria-expanded={expanded}
+            className="btn btn-outline text-xs px-4 py-2 shrink-0"
+          >
+            {expanded ? (
+              <>
+                <ChevronUp size={14} /> Show less
+              </>
+            ) : (
+              <>
+                <ChevronDown size={14} /> Show all ({anime.length})
+              </>
+            )}
+          </button>
+        )}
       </div>
       {state.status === 'loading' ? (
         <p className="text-sm text-[var(--color-muted)]">Loading...</p>
       ) : state.status === 'error' ? (
         <p className="text-xs text-[var(--color-error)]">{state.message}</p>
-      ) : state.anime.length === 0 ? (
+      ) : anime.length === 0 ? (
         <p className="text-sm text-[var(--color-muted)]">Nothing to show here yet.</p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-start">
-          {state.anime.map((a) => (
+          {visible.map((a) => (
             <AnimeCard key={a.id} anime={a} />
           ))}
         </div>
@@ -51,11 +82,32 @@ function AnimeSection({ title, state, tint }: AnimeSectionProps) {
   )
 }
 
+const SECTION_KEYS = ['byGenre', 'trending', 'newReleases', 'random'] as const
+type SectionKey = (typeof SECTION_KEYS)[number]
+
 export default function Recommendations() {
   const [byGenre, setByGenre] = useState<SectionState>({ status: 'loading' })
   const [trending, setTrending] = useState<SectionState>({ status: 'loading' })
   const [newReleases, setNewReleases] = useState<SectionState>({ status: 'loading' })
   const [random, setRandom] = useState<SectionState>({ status: 'loading' })
+
+  const [expanded, setExpanded] = useState<Record<SectionKey, boolean>>({
+    byGenre: false,
+    trending: false,
+    newReleases: false,
+    random: false,
+  })
+
+  function toggleSection(key: SectionKey) {
+    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const allExpanded = SECTION_KEYS.every((key) => expanded[key])
+
+  function toggleAll() {
+    const next = !allExpanded
+    setExpanded({ byGenre: next, trending: next, newReleases: next, random: next })
+  }
 
   useEffect(() => {
     function load(
@@ -90,17 +142,54 @@ export default function Recommendations() {
         <span className="pill w-fit text-xs font-medium uppercase tracking-wide text-[var(--color-muted)]">
           Personalized picks
         </span>
-        <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-[var(--color-ink)] mt-4 mb-2">
-          Your Top Recommendations
-        </h1>
+        <div className="flex flex-wrap items-center justify-between gap-4 mt-4 mb-2">
+          <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-[var(--color-ink)]">
+            Your Top Recommendations
+          </h1>
+          <button type="button" onClick={toggleAll} className="btn btn-outline text-sm px-5 py-2.5 shrink-0">
+            {allExpanded ? (
+              <>
+                <Minimize2 size={16} /> Collapse All
+              </>
+            ) : (
+              <>
+                <Maximize2 size={16} /> Expand All
+              </>
+            )}
+          </button>
+        </div>
         <p className="text-[var(--color-muted)] max-w-xl">
           Click on any anime title or its image to toggle more information about it.
         </p>
 
-        <AnimeSection title="For You" state={byGenre} tint="var(--color-peach)" />
-        <AnimeSection title="Trending Now" state={trending} tint="var(--color-mint)" />
-        <AnimeSection title="New Releases" state={newReleases} tint="var(--color-butter)" />
-        <AnimeSection title="Random Recommendations" state={random} tint="var(--color-sky)" />
+        <AnimeSection
+          title="For You"
+          state={byGenre}
+          tint="var(--color-peach)"
+          expanded={expanded.byGenre}
+          onToggleExpanded={() => toggleSection('byGenre')}
+        />
+        <AnimeSection
+          title="Trending Now"
+          state={trending}
+          tint="var(--color-mint)"
+          expanded={expanded.trending}
+          onToggleExpanded={() => toggleSection('trending')}
+        />
+        <AnimeSection
+          title="New Releases"
+          state={newReleases}
+          tint="var(--color-butter)"
+          expanded={expanded.newReleases}
+          onToggleExpanded={() => toggleSection('newReleases')}
+        />
+        <AnimeSection
+          title="Random Recommendations"
+          state={random}
+          tint="var(--color-sky)"
+          expanded={expanded.random}
+          onToggleExpanded={() => toggleSection('random')}
+        />
       </main>
 
       <Footer />

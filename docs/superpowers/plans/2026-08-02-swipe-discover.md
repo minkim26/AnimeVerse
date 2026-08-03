@@ -64,14 +64,14 @@ In `anime-verse-backend/compose.yml`, change the `postgres` service:
 
 ```yaml
   postgres:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg18
 ```
 
-(only the `image` line changes — healthcheck, ports, env_file, restart policy all stay as-is)
+(only the `image` line changes — healthcheck, ports, env_file, restart policy all stay as-is. Note: this plan originally used `pg17`, inferred as roughly matching what the unpinned `postgres` image it replaces would resolve to. The final whole-branch review verified that guess against the real image — `docker run --rm postgres:latest postgres --version` reports PostgreSQL 18.3 — so the plan and code both moved to `pg18` to avoid an unintended downgrade.)
 
 - [ ] **Step 2: Swap the Postgres image in both CI jobs**
 
-In `.github/workflows/ci.yml`, change `image: postgres` to `image: pgvector/pgvector:pg17` in **both** the `backend` job's `postgres` service and the `e2e` job's `postgres` service (two separate edits — each job declares its own service block).
+In `.github/workflows/ci.yml`, change `image: postgres` to `image: pgvector/pgvector:pg18` in **both** the `backend` job's `postgres` service and the `e2e` job's `postgres` service (two separate edits — each job declares its own service block).
 
 - [ ] **Step 3: Add the `Anime`/`Swipe` models to the schema**
 
@@ -1055,5 +1055,5 @@ git commit -m "Document the pgvector image and client-supplied swipe metadata"
 - **`Preferences.tsx`/`api/preferences.ts` untouched**, per the task's explicit scope boundary — Discover only *reads* `GET /preferences/me` through the existing `getPreferences()` service, never modifies either file.
 - **`WatchlistItem`/`Review` untouched** — their FK migration to `Anime` is roadmap #5.
 - **Type consistency:** `AnimeCacheInput`/`upsertAnime` defined once (Task 2), consumed only in Task 3. `fetchDiscoverPool`/`postSwipe`/`getMySwipes`/`MySwipe`/`SwipeAction` defined once (Task 4), consumed in Tasks 5-6.
-- **No placeholders:** the tag vocabulary count (335) was re-confirmed against the actual `data/anilistTags.json` file on disk while writing this plan, not assumed from plan #1's text. The `pgvector/pgvector:pg17` and `:pg16` tags were both confirmed to exist on Docker Hub (`docker manifest inspect`) rather than assumed from the bare `postgres` tag they replace.
+- **No placeholders:** the tag vocabulary count (335) was re-confirmed against the actual `data/anilistTags.json` file on disk while writing this plan, not assumed from plan #1's text. The `pgvector/pgvector:pg18` tag was confirmed to exist on Docker Hub, and `postgres:latest` was confirmed via `docker run --version` to actually be PostgreSQL 18.3 — the plan's initial `pg17` guess was corrected to `pg18` during the final whole-branch review once this was checked directly, rather than left as an unverified assumption.
 - **Edge case, not a bug:** if `Discover.tsx`'s AniList pool comes back with every id already in the user's swipe history (a returning user on the persistent tab, after enough sessions), `cards` is empty and the page shows the same "That's the deck for now" completion state as finishing a normal deck — there's no separate empty-pool error state, and none is needed.

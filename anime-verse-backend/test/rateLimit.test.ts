@@ -124,9 +124,9 @@ describe('swipesLimiter', () => {
             expect(okB.status).not.toBe(429)
 
             await redis.del(`rl:swipes:user:${userA.id}`)
-            await prisma.anime.deleteMany({ where: { id: { in: animeIds } } }).catch(() => {})
             await userA.cleanup()
             await userB.cleanup()
+            await prisma.anime.deleteMany({ where: { id: { in: animeIds } } }).catch(() => {})
         },
         20_000
     )

@@ -33,11 +33,11 @@ const HERO_TILE_COLORS = ['var(--color-peach)', 'var(--color-mint)', 'var(--colo
 
 // Bento sizing/surface per feature card below — deliberate size variation
 // (wide/narrow/narrow/wide), each tinted to match its hero tile above.
-const FEATURE_LAYOUTS: { span: string; surface: string; bg?: string }[] = [
-  { span: 'col-span-6 md:col-span-4', surface: 'tile-accent', bg: 'var(--color-peach)' },
-  { span: 'col-span-6 md:col-span-2', surface: 'tile-accent', bg: 'var(--color-mint)' },
-  { span: 'col-span-6 md:col-span-2', surface: 'tile-accent', bg: 'var(--color-butter)' },
-  { span: 'col-span-6 md:col-span-4', surface: 'tile-accent', bg: 'var(--color-sky)' },
+const FEATURE_LAYOUTS: { span: string; bg: string }[] = [
+  { span: 'col-span-6 md:col-span-4', bg: 'var(--color-peach)' },
+  { span: 'col-span-6 md:col-span-2', bg: 'var(--color-mint)' },
+  { span: 'col-span-6 md:col-span-2', bg: 'var(--color-butter)' },
+  { span: 'col-span-6 md:col-span-4', bg: 'var(--color-sky)' },
 ]
 
 export default function Home() {
@@ -100,8 +100,8 @@ export default function Home() {
               return (
                 <div
                   key={title}
-                  className={`${layout.surface} ${layout.span} p-6 md:p-8 flex flex-col gap-4`}
-                  style={layout.bg ? { background: layout.bg } : undefined}
+                  className={`tile-accent ${layout.span} p-6 md:p-8 flex flex-col gap-4`}
+                  style={{ background: layout.bg }}
                 >
                   <Icon className="text-[var(--color-ink)]" size={32} strokeWidth={1.75} />
                   <h3 className="font-display text-xl md:text-2xl font-semibold text-[var(--color-ink)]">{title}</h3>

@@ -1,15 +1,18 @@
 import { apiRequest } from './api.ts'
 
-export async function getPreferences(): Promise<string[]> {
-  const { genres } = await apiRequest<{ genres: string[] }>('/preferences/me', { auth: true })
-  return genres
+export interface Preferences {
+  genres: string[]
+  showAdultContent: boolean
 }
 
-export async function savePreferences(genres: string[]): Promise<string[]> {
-  const result = await apiRequest<{ genres: string[] }>('/preferences/me', {
+export async function getPreferences(): Promise<Preferences> {
+  return apiRequest<Preferences>('/preferences/me', { auth: true })
+}
+
+export async function savePreferences(preferences: Preferences): Promise<Preferences> {
+  return apiRequest<Preferences>('/preferences/me', {
     method: 'PUT',
     auth: true,
-    body: { genres },
+    body: preferences,
   })
-  return result.genres
 }

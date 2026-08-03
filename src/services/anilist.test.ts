@@ -139,6 +139,30 @@ describe('fetchAnimeByGenres', () => {
   })
 })
 
+describe('adult content filtering', () => {
+  it('filters isAdult and the Ecchi genre by default', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchTrendingNow()
+
+    const variables = lastRequestVariables(fetchMock)
+    expect(variables.isAdult).toBe(false)
+    expect(variables.genre_not_in).toEqual(['Ecchi'])
+  })
+
+  it('applies no adult-content filter when showAdultContent is true', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchTrendingNow(true)
+
+    const variables = lastRequestVariables(fetchMock)
+    expect(variables.isAdult).toBeUndefined()
+    expect(variables.genre_not_in).toBeUndefined()
+  })
+})
+
 describe('fetchTrendingNow', () => {
   it('sorts by TRENDING_DESC', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))

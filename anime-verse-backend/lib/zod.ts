@@ -11,7 +11,8 @@ export const UpdatePassword = z.object({
 })
 
 export const Preferences = z.object({
-    genres: z.array(z.string()).default([])
+    genres: z.array(z.string()).default([]),
+    showAdultContent: z.boolean().default(false)
 })
 
 export const WatchlistItem = z.object({

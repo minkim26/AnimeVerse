@@ -158,7 +158,7 @@ function PreferencesSummary() {
   const [genres, setGenres] = useState<string[] | null>(null)
 
   useEffect(() => {
-    getPreferences().then(setGenres)
+    getPreferences().then((prefs) => setGenres(prefs.genres))
   }, [])
 
   return (
@@ -235,14 +235,20 @@ function QuoteGenerator() {
 function RandomAnimeGenerator() {
   const [anime, setAnime] = useState<{ title: string; imageUrl: string; description: string } | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [showAdultContent, setShowAdultContent] = useState(false)
 
   useEffect(() => {
-    fetchRandomAnime().then(setAnime)
+    getPreferences()
+      .then((prefs) => {
+        setShowAdultContent(prefs.showAdultContent)
+        return fetchRandomAnime(prefs.showAdultContent)
+      })
+      .then(setAnime)
   }, [])
 
   function handleRefresh() {
     setShowDetails(false)
-    fetchRandomAnime().then(setAnime)
+    fetchRandomAnime(showAdultContent).then(setAnime)
   }
 
   return (

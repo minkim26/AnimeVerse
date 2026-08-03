@@ -7,13 +7,17 @@ import { getPreferences, savePreferences } from '../services/preferences.ts'
 
 export default function Preferences() {
   const [genres, setGenres] = useState<string[]>([])
+  const [showAdultContent, setShowAdultContent] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     getPreferences()
-      .then(setGenres)
+      .then((prefs) => {
+        setGenres(prefs.genres)
+        setShowAdultContent(prefs.showAdultContent)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -27,7 +31,7 @@ export default function Preferences() {
 
     setSaving(true)
     try {
-      await savePreferences(genres)
+      await savePreferences({ genres, showAdultContent })
       navigate('/recommendations')
     } finally {
       setSaving(false)
@@ -54,6 +58,22 @@ export default function Preferences() {
         ) : (
           <form onSubmit={handleSubmit}>
             <GenreCheckboxGroup selected={genres} onChange={setGenres} />
+
+            <label className="surface-card flex items-start gap-3 p-4 mt-6 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showAdultContent}
+                onChange={(e) => setShowAdultContent(e.target.checked)}
+                className="accent-[var(--color-accent)] mt-1 shrink-0"
+              />
+              <span>
+                <span className="block text-sm font-medium text-[var(--color-ink)]">Show adult content</span>
+                <span className="block text-xs text-[var(--color-muted)] mt-1">
+                  Off by default. Filters explicit (Hentai) titles and the Ecchi genre out of every
+                  recommendation and random-pick section.
+                </span>
+              </span>
+            </label>
 
             <p className="text-xs text-[var(--color-muted)] mt-6">
               Updating your preferences will change the recommendations you receive. The more preferences you

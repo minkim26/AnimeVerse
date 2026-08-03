@@ -23,10 +23,11 @@ model User {
 
 // Preference — one row per user, full-replace semantics for their genre list.
 model Preference {
-    userId    Int      @id
-    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    genres    String[]
-    updatedAt DateTime @updatedAt
+    userId           Int      @id
+    user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    genres           String[]
+    showAdultContent Boolean  @default(false)
+    updatedAt        DateTime @updatedAt
 }
 
 // WatchlistItem — an anime a user has saved. Provisioned for API completeness;

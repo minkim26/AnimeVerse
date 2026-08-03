@@ -128,10 +128,21 @@ export default function Recommendations() {
         })
     }
 
-    load('For You', () => getPreferences().then(fetchAnimeByGenres), setByGenre)
-    load('Trending Now', fetchTrendingNow, setTrending)
-    load('New Releases', fetchNewReleases, setNewReleases)
-    load('Random Recommendations', fetchRandomRecommendations, setRandom)
+    // Preferences are fetched once and fanned out to all four sections so the
+    // adult-content setting applies everywhere, not just the genre-based one.
+    // A failed preferences fetch falls back to the safe (hidden) default
+    // rather than leaving the whole page stuck loading.
+    getPreferences()
+      .catch((err: unknown) => {
+        console.error('[Recommendations] Failed to load preferences, defaulting to adult content hidden:', err)
+        return { genres: [], showAdultContent: false }
+      })
+      .then((prefs) => {
+        load('For You', () => fetchAnimeByGenres(prefs.genres, prefs.showAdultContent), setByGenre)
+        load('Trending Now', () => fetchTrendingNow(prefs.showAdultContent), setTrending)
+        load('New Releases', () => fetchNewReleases(prefs.showAdultContent), setNewReleases)
+        load('Random Recommendations', () => fetchRandomRecommendations(prefs.showAdultContent), setRandom)
+      })
   }, [])
 
   return (

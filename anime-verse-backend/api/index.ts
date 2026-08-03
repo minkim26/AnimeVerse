@@ -7,6 +7,7 @@ import reviewsRouter from './reviews.ts'
 import quotesRouter from './quotes.ts'
 import titlesRouter from './titles.ts'
 import avatarRouter from './avatar.ts'
+import swipesRouter from './swipes.ts'
 
 const router = Router()
 router.use('/users', usersRouter)
@@ -16,5 +17,6 @@ router.use('/reviews', reviewsRouter)
 router.use('/quotes', quotesRouter)
 router.use('/titles', titlesRouter)
 router.use('/avatar', avatarRouter)
+router.use('/swipes', swipesRouter)
 
 export default router

@@ -199,3 +199,15 @@ export async function fetchRandomAnime(
     description: animeSynopsis(anime),
   }
 }
+
+// Powers the Discover swipe deck: one request for a pool of popular titles,
+// same randomPage/adultContentFilter pattern as fetchRandomRecommendations.
+// Discover.tsx filters out already-swiped ids client-side.
+export async function fetchDiscoverPool(showAdultContent = false): Promise<AniListAnime[]> {
+  return fetchMediaList({
+    page: randomPage(),
+    perPage: 50,
+    sort: ['POPULARITY_DESC'],
+    ...adultContentFilter(showAdultContent),
+  })
+}

@@ -26,7 +26,7 @@ jobs:
         working-directory: anime-verse-backend
     services:
       postgres:
-        image: postgres
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -83,7 +83,7 @@ jobs:
     needs: [frontend, backend]
     services:
       postgres:
-        image: postgres
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres

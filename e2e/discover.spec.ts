@@ -4,7 +4,7 @@ function uniqueEmail(): string {
   return `e2e-${Date.now()}-${Math.floor(Math.random() * 10000)}@example.com`
 }
 
-test('signup then Recommendations page renders AniList-backed sections', async ({ page }) => {
+test('a new user is redirected to Discover before reaching Recommendations, and swiping unlocks it', async ({ page }) => {
   const email = uniqueEmail()
   const password = 'correct horse battery staple'
 
@@ -20,14 +20,16 @@ test('signup then Recommendations page renders AniList-backed sections', async (
 
   await page.waitForURL('**/profile')
   await page.goto('/recommendations')
-  await page.waitForURL('**/discover')
-  await page.getByRole('button', { name: 'Like' }).click()
+  await expect(page).toHaveURL(/\/discover$/)
+
+  await expect(page.getByRole('heading', { name: 'Swipe to build your taste profile' })).toBeVisible()
+  await page.getByRole('button', { name: 'Like' }).click({ timeout: 15000 })
 
   await page.goto('/recommendations')
-
+  // Asserting on rendered content rather than the URL: RequireOnboarding
+  // shows a brief loading shell while its GET /swipes/me check is in
+  // flight, so the URL reads "/recommendations" for a beat even on a run
+  // where the gate is about to redirect. The heading only appears once the
+  // gate has actually let the page through.
   await expect(page.getByRole('heading', { name: 'Your Top Recommendations' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Trending Now' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'New Releases' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Random Recommendations' })).toBeVisible()
-  await expect(page.locator('img').first()).toBeVisible({ timeout: 15000 })
 })

@@ -7,12 +7,27 @@ vi.mock('../lib/supabase.ts', async () => {
 })
 
 import app from '../app.ts'
+import prisma from '../lib/prisma.ts'
 import redis from '../lib/redis.ts'
 import { createTestUser } from './helpers.ts'
 import { FAKE_PNG } from './supabaseMock.ts'
 
 const AUTH_LIMIT = 10
 const UPLOAD_LIMIT = 20
+const SWIPES_LIMIT = 200
+const HOUR_MS = 60 * 60_000
+
+function randomAnimeId(): number {
+    return Math.floor(Math.random() * 1_000_000_000) + 1_000_000_000
+}
+
+function swipeBody(animeId: number) {
+    return {
+        animeId,
+        action: 'LIKE',
+        anime: { title: 'Test Anime', posterUrl: 'https://example.com/poster.jpg', synopsis: 'A synopsis.', tags: [{ name: 'Isekai', rank: 80 }] }
+    }
+}
 
 describe('authLimiter', () => {
     beforeAll(async () => {
@@ -70,5 +85,49 @@ describe('uploadLimiter', () => {
             await userB.cleanup()
         },
         30_000
+    )
+})
+
+describe('swipesLimiter', () => {
+    it(
+        'is keyed per authenticated user, not shared across users',
+        async () => {
+            const userA = await createTestUser(app)
+            const userB = await createTestUser(app)
+            const animeIds: number[] = []
+
+            // 200 real requests would be slow for what's really just a
+            // wiring/keying check, so pre-seed userA's counter to one below
+            // the limit directly in Redis instead of looping.
+            await redis.set(`rl:swipes:user:${userA.id}`, SWIPES_LIMIT - 1, { PX: HOUR_MS })
+
+            const animeIdAtLimit = randomAnimeId()
+            animeIds.push(animeIdAtLimit)
+            const atLimit = await request(app)
+                .post('/swipes')
+                .set('Authorization', `Bearer ${userA.token}`)
+                .send(swipeBody(animeIdAtLimit))
+            expect(atLimit.status).not.toBe(429)
+
+            const blockedA = await request(app)
+                .post('/swipes')
+                .set('Authorization', `Bearer ${userA.token}`)
+                .send(swipeBody(randomAnimeId()))
+            expect(blockedA.status).toBe(429)
+
+            const animeIdB = randomAnimeId()
+            animeIds.push(animeIdB)
+            const okB = await request(app)
+                .post('/swipes')
+                .set('Authorization', `Bearer ${userB.token}`)
+                .send(swipeBody(animeIdB))
+            expect(okB.status).not.toBe(429)
+
+            await redis.del(`rl:swipes:user:${userA.id}`)
+            await userA.cleanup()
+            await userB.cleanup()
+            await prisma.anime.deleteMany({ where: { id: { in: animeIds } } }).catch(() => {})
+        },
+        20_000
     )
 })

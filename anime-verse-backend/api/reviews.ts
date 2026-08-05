@@ -3,8 +3,11 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.ts'
 import { Review } from '../lib/zod.ts'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.ts'
+import { reviewsLimiter } from '../lib/rateLimit.ts'
 
 const router = Router()
+
+const MAX_LIST_SIZE = 100
 
 /*
  * Provisioned for API completeness — no frontend page consumes this yet,
@@ -15,12 +18,13 @@ const router = Router()
 router.get('/', requireAuth, async (req: AuthenticatedRequest, res) => {
     const reviews = await prisma.review.findMany({
         where: { userId: req.user!.id },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        take: MAX_LIST_SIZE
     })
     res.status(200).send({ reviews })
 })
 
-router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
+router.post('/', requireAuth, reviewsLimiter, async (req: AuthenticatedRequest, res) => {
     const data = Review.parse(req.body)
 
     const review = await prisma.review.upsert({

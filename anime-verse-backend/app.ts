@@ -1,6 +1,7 @@
 import express from 'express'
 import cors from 'cors'
 import morgan from 'morgan'
+import multer from 'multer'
 import * as z from 'zod'
 import { Prisma } from './generated/prisma/client.ts'
 
@@ -38,6 +39,8 @@ app.use((err: unknown, req: express.Request, res: express.Response, next: expres
     } else if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
         // Record not found — fall through to the 404 handler.
         next()
+    } else if (err instanceof multer.MulterError) {
+        res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).send({ error: err.message })
     } else if (typeof err === 'object' && err !== null && 'status' in err && 'message' in err) {
         res.status(Number((err as { status: unknown }).status)).send({ error: (err as { message: unknown }).message })
     } else {

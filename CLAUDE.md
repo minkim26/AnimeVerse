@@ -40,7 +40,7 @@ Auth is self-issued JWTs (`lib/auth.ts`: `generateToken`/`verifyToken`/`requireA
 
 Run the `/humanizer` skill on any prose written for this repo before presenting it: documentation (`README.md`, `CLAUDE.md`, `docs/*.md`), commit messages, and PR descriptions. For commit messages specifically, run it whenever possible, even for a quick one-line commit.
 
-Keep it short and keep it accurate. Less is more. Commit messages should be as short as the change allows: a one-line subject alone is fine when nothing needs explaining, and a body, when needed, is one to three short paragraphs, not a design doc. Cut any sentence that defends a decision nobody questioned. Never trade a correct detail for a smoother sentence, and if a claim isn't verified, say so or leave it out.
+Keep it short and keep it accurate. Less is more. Default to a subject line alone with no body. Only add a body when the change genuinely can't be understood from the diff and subject together, and keep it to one to three short paragraphs, not a design doc. Cut any sentence that defends a decision nobody questioned. Never trade a correct detail for a smoother sentence, and if a claim isn't verified, say so or leave it out.
 
 No em dashes, no conventional-commit prefixes, no AI attribution, no emoji.
 

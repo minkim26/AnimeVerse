@@ -29,9 +29,13 @@ interface RequestOptions {
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, auth = false } = options
+  // FormData bodies (file uploads) are passed through as-is: the browser
+  // sets its own multipart Content-Type with boundary, and JSON.stringify
+  // would mangle a File into "{}".
+  const isFormData = body instanceof FormData
 
   const headers: Record<string, string> = {}
-  if (body !== undefined) {
+  if (body !== undefined && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
   if (auth) {
@@ -44,7 +48,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const response = await fetch(`${API_URL}${path}`, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: isFormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
   })
 
   if (response.status === 204) {

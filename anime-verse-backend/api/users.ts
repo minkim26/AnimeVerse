@@ -3,14 +3,13 @@ import bcrypt from 'bcryptjs'
 
 import prisma from '../lib/prisma.ts'
 import { User, UpdatePassword } from '../lib/zod.ts'
-import { generateToken, requireAuth, type AuthenticatedRequest } from '../lib/auth.ts'
-import { getJSON, setJSON, invalidate, userCacheKey } from '../lib/cache.ts'
+import { generateToken, requireAuth, revokeTokensIssuedBefore, type AuthenticatedRequest } from '../lib/auth.ts'
+import { getJSON, setJSON, invalidate, userCacheKey, withoutPassword, USER_CACHE_TTL_SECONDS } from '../lib/cache.ts'
 import { authLimiter } from '../lib/rateLimit.ts'
 
 const router = Router()
 
 const BCRYPT_COST_FACTOR = 10
-const USER_CACHE_TTL_SECONDS = 5 * 60
 
 /*
  * POST /users — Register a new user.
@@ -25,11 +24,11 @@ const USER_CACHE_TTL_SECONDS = 5 * 60
 router.post('/', authLimiter, async (req, res) => {
     const data = User.parse(req.body)
 
-    const existing = await prisma.user.findUnique({ where: { email: data.email } })
-    if (existing) {
-        return res.status(400).send({ error: 'A user with that email already exists' })
-    }
-
+    // No pre-check for an existing email: that would return a distinct
+    // response for "already registered" vs. any other failure, letting an
+    // attacker enumerate which emails have accounts. The @unique constraint
+    // on User.email does the work instead; app.ts's error handler turns the
+    // resulting P2002 into the same generic 400 as any other failure here.
     const hashedPassword = await bcrypt.hash(data.password, BCRYPT_COST_FACTOR)
 
     const user = await prisma.user.create({
@@ -48,11 +47,7 @@ router.post('/', authLimiter, async (req, res) => {
  * Returns: 200 { token } on success, 401 on invalid credentials
  */
 router.post('/login', authLimiter, async (req, res) => {
-    const { email, password } = req.body
-
-    if (!email || !password) {
-        return res.status(400).send({ error: 'Email and password are required' })
-    }
+    const { email, password } = User.parse(req.body)
 
     const user = await prisma.user.findUnique({ where: { email } })
 
@@ -80,9 +75,9 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
         return res.status(404).send({ error: 'User not found' })
     }
 
-    const { password, ...userWithoutPassword } = user
-    await setJSON(cacheKey, userWithoutPassword, USER_CACHE_TTL_SECONDS)
-    res.status(200).send(userWithoutPassword)
+    const sanitized = withoutPassword(user)
+    await setJSON(cacheKey, sanitized, USER_CACHE_TTL_SECONDS)
+    res.status(200).send(sanitized)
 })
 
 /*
@@ -107,6 +102,7 @@ router.patch('/me/password', requireAuth, async (req: AuthenticatedRequest, res)
     const hashedNewPassword = await bcrypt.hash(data.newPassword, BCRYPT_COST_FACTOR)
     await prisma.user.update({ where: { id: user.id }, data: { password: hashedNewPassword } })
     await invalidate(userCacheKey(user.id))
+    await revokeTokensIssuedBefore(user.id)
 
     res.status(204).send()
 })

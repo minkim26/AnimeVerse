@@ -114,6 +114,17 @@ function randomPage(): number {
   return Math.floor(Math.random() * 20) + 1
 }
 
+// Shared by fetchRandomRecommendations/fetchRandomAnime/fetchDiscoverPool:
+// same random-page, popularity-sorted pool, just a different perPage.
+function fetchRandomPool(perPage: number, showAdultContent: boolean): Promise<AniListAnime[]> {
+  return fetchMediaList({
+    page: randomPage(),
+    perPage,
+    sort: ['POPULARITY_DESC'],
+    ...adultContentFilter(showAdultContent),
+  })
+}
+
 const CACHE_TTL_MS = 5 * 60 * 1000
 
 // In-memory only — resets on a hard page reload, which is fine, it exists to
@@ -173,12 +184,7 @@ export async function fetchNewReleases(showAdultContent = false): Promise<AniLis
 }
 
 export async function fetchRandomRecommendations(showAdultContent = false): Promise<AniListAnime[]> {
-  const pool = await fetchMediaList({
-    page: randomPage(),
-    perPage: 40,
-    sort: ['POPULARITY_DESC'],
-    ...adultContentFilter(showAdultContent),
-  })
+  const pool = await fetchRandomPool(40, showAdultContent)
   const shuffled = [...pool].sort(() => 0.5 - Math.random())
   return shuffled.slice(0, 12)
 }
@@ -186,12 +192,7 @@ export async function fetchRandomRecommendations(showAdultContent = false): Prom
 export async function fetchRandomAnime(
   showAdultContent = false,
 ): Promise<{ title: string; imageUrl: string; description: string }> {
-  const pool = await fetchMediaList({
-    page: randomPage(),
-    perPage: 40,
-    sort: ['POPULARITY_DESC'],
-    ...adultContentFilter(showAdultContent),
-  })
+  const pool = await fetchRandomPool(40, showAdultContent)
   const anime = pool[Math.floor(Math.random() * pool.length)]!
   return {
     title: animeTitle(anime),
@@ -200,14 +201,8 @@ export async function fetchRandomAnime(
   }
 }
 
-// Powers the Discover swipe deck: one request for a pool of popular titles,
-// same randomPage/adultContentFilter pattern as fetchRandomRecommendations.
+// Powers the Discover swipe deck: one request for a pool of popular titles.
 // Discover.tsx filters out already-swiped ids client-side.
 export async function fetchDiscoverPool(showAdultContent = false): Promise<AniListAnime[]> {
-  return fetchMediaList({
-    page: randomPage(),
-    perPage: 50,
-    sort: ['POPULARITY_DESC'],
-    ...adultContentFilter(showAdultContent),
-  })
+  return fetchRandomPool(50, showAdultContent)
 }

@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AnimeVerse - Discover Anime Recommendations</title>
+    <!--
+      No production host is configured yet (see CLAUDE.md), so this meta tag
+      is the only place a CSP can live right now. A meta tag can't set
+      frame-ancestors, Strict-Transport-Security, X-Frame-Options, or
+      Permissions-Policy — those need to be added as real response headers
+      once a host exists (see anime-verse-backend/app.ts for the ones
+      already set on the API's own responses).
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; font-src 'self'; connect-src 'self' https://graphql.anilist.co %VITE_API_URL%; object-src 'none'; frame-src 'none'; base-uri 'self'"
+    />
   </head>
   <body>
     <div id="root"></div>

@@ -27,3 +27,13 @@ describe('GET /health', () => {
         expect(res.body).toEqual({ status: 'ok' })
     })
 })
+
+describe('security headers', () => {
+    it('sets nosniff, frame-deny, and a referrer policy on every response', async () => {
+        const res = await request(app).get('/health')
+
+        expect(res.headers['x-content-type-options']).toBe('nosniff')
+        expect(res.headers['x-frame-options']).toBe('DENY')
+        expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin')
+    })
+})

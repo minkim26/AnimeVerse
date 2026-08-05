@@ -11,20 +11,20 @@ export const UpdatePassword = z.object({
 })
 
 export const Preferences = z.object({
-    genres: z.array(z.string()).default([]),
+    genres: z.array(z.string().max(50)).max(50).default([]),
     showAdultContent: z.boolean().default(false)
 })
 
 export const WatchlistItem = z.object({
-    animeId: z.string().min(1),
-    title: z.string().optional(),
-    posterUrl: z.string().optional()
+    animeId: z.string().min(1).max(100),
+    title: z.string().max(500).optional(),
+    posterUrl: z.url().max(2000).optional()
 })
 
 export const Review = z.object({
-    animeId: z.string().min(1),
+    animeId: z.string().min(1).max(100),
     rating: z.int().min(1).max(5),
-    reviewText: z.string().min(1)
+    reviewText: z.string().min(1).max(5000)
 })
 
 export const SwipeActionValue = z.enum(['SKIP', 'LIKE', 'LOVE'])

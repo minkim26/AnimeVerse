@@ -58,7 +58,7 @@ jobs:
           --health-retries 5
     env:
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/animeverse
-      JWT_SECRET: test-secret
+      JWT_SECRET: ci-test-jwt-secret-not-for-production-use
       FRONTEND_URL: http://localhost:5173
       REDIS_URL: redis://localhost:6379
       RABBITMQ_URL: amqp://localhost
@@ -115,7 +115,7 @@ jobs:
           --health-retries 5
     env:
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/animeverse
-      JWT_SECRET: test-secret
+      JWT_SECRET: ci-test-jwt-secret-not-for-production-use
       # Must match the port Playwright boots the frontend dev server on
       # (playwright.config.ts webServer) — server.ts's cors() rejects
       # any other origin.

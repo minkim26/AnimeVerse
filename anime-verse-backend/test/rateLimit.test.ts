@@ -15,10 +15,16 @@ import { FAKE_PNG } from './supabaseMock.ts'
 const AUTH_LIMIT = 10
 const UPLOAD_LIMIT = 20
 const SWIPES_LIMIT = 200
+const WATCHLIST_LIMIT = 100
+const REVIEWS_LIMIT = 100
 const HOUR_MS = 60 * 60_000
 
 function randomAnimeId(): number {
     return Math.floor(Math.random() * 1_000_000_000) + 1_000_000_000
+}
+
+function randomStringAnimeId(): string {
+    return `anime-${Math.floor(Math.random() * 1_000_000_000)}`
 }
 
 function swipeBody(animeId: number) {
@@ -127,6 +133,76 @@ describe('swipesLimiter', () => {
             await userA.cleanup()
             await userB.cleanup()
             await prisma.anime.deleteMany({ where: { id: { in: animeIds } } }).catch(() => {})
+        },
+        20_000
+    )
+})
+
+describe('watchlistLimiter', () => {
+    it(
+        'is keyed per authenticated user, not shared across users',
+        async () => {
+            const userA = await createTestUser(app)
+            const userB = await createTestUser(app)
+
+            await redis.set(`rl:watchlist:user:${userA.id}`, WATCHLIST_LIMIT - 1, { PX: HOUR_MS })
+
+            const atLimit = await request(app)
+                .post('/watchlist')
+                .set('Authorization', `Bearer ${userA.token}`)
+                .send({ animeId: randomStringAnimeId() })
+            expect(atLimit.status).not.toBe(429)
+
+            const blockedA = await request(app)
+                .post('/watchlist')
+                .set('Authorization', `Bearer ${userA.token}`)
+                .send({ animeId: randomStringAnimeId() })
+            expect(blockedA.status).toBe(429)
+
+            const okB = await request(app)
+                .post('/watchlist')
+                .set('Authorization', `Bearer ${userB.token}`)
+                .send({ animeId: randomStringAnimeId() })
+            expect(okB.status).not.toBe(429)
+
+            await redis.del(`rl:watchlist:user:${userA.id}`)
+            await userA.cleanup()
+            await userB.cleanup()
+        },
+        20_000
+    )
+})
+
+describe('reviewsLimiter', () => {
+    it(
+        'is keyed per authenticated user, not shared across users',
+        async () => {
+            const userA = await createTestUser(app)
+            const userB = await createTestUser(app)
+
+            await redis.set(`rl:reviews:user:${userA.id}`, REVIEWS_LIMIT - 1, { PX: HOUR_MS })
+
+            const atLimit = await request(app)
+                .post('/reviews')
+                .set('Authorization', `Bearer ${userA.token}`)
+                .send({ animeId: randomStringAnimeId(), rating: 5, reviewText: 'Good.' })
+            expect(atLimit.status).not.toBe(429)
+
+            const blockedA = await request(app)
+                .post('/reviews')
+                .set('Authorization', `Bearer ${userA.token}`)
+                .send({ animeId: randomStringAnimeId(), rating: 5, reviewText: 'Good.' })
+            expect(blockedA.status).toBe(429)
+
+            const okB = await request(app)
+                .post('/reviews')
+                .set('Authorization', `Bearer ${userB.token}`)
+                .send({ animeId: randomStringAnimeId(), rating: 5, reviewText: 'Good.' })
+            expect(okB.status).not.toBe(429)
+
+            await redis.del(`rl:reviews:user:${userA.id}`)
+            await userA.cleanup()
+            await userB.cleanup()
         },
         20_000
     )

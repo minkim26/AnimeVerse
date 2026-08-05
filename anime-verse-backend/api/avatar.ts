@@ -2,18 +2,22 @@ import { Router } from 'express'
 import multer from 'multer'
 import amqplib from 'amqplib'
 import path from 'path'
+import sharp from 'sharp'
 
 import prisma from '../lib/prisma.ts'
 import supabase from '../lib/supabase.ts'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.ts'
-import { invalidate, userCacheKey } from '../lib/cache.ts'
+import { setJSON, userCacheKey, withoutPassword, USER_CACHE_TTL_SECONDS } from '../lib/cache.ts'
 import { uploadLimiter } from '../lib/rateLimit.ts'
 import { AVATAR_QUEUE, setupAvatarQueue } from '../lib/queue.ts'
 
 const router = Router()
 
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024
+
 const upload = multer({
     storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_AVATAR_BYTES },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) {
             cb(null, true)
@@ -22,6 +26,16 @@ const upload = multer({
         }
     }
 })
+
+/*
+ * ALLOWED_IMAGE_FORMATS gates on the format sharp actually decodes from the
+ * file's bytes, not the client-supplied mimetype the fileFilter above checks
+ * (trivially spoofable). This is what rejects a non-image file uploaded
+ * with a fake "image/*" Content-Type, and specifically excludes SVG — a
+ * real image format sharp can decode, but one that can carry an embedded
+ * <script>, unlike the raster formats below.
+ */
+const ALLOWED_IMAGE_FORMATS = new Set(['jpeg', 'png', 'gif', 'webp'])
 
 let channel: amqplib.Channel | null = null
 async function getChannel(): Promise<amqplib.Channel> {
@@ -56,6 +70,16 @@ router.post('/', requireAuth, uploadLimiter, upload.single('file'), async (req: 
         return res.status(400).send({ error: 'A file field containing an image is required' })
     }
 
+    let detectedFormat: string | undefined
+    try {
+        detectedFormat = (await sharp(req.file.buffer).metadata()).format
+    } catch {
+        return res.status(400).send({ error: 'The uploaded file is not a valid image' })
+    }
+    if (!detectedFormat || !ALLOWED_IMAGE_FORMATS.has(detectedFormat)) {
+        return res.status(400).send({ error: 'Unsupported image format' })
+    }
+
     const ext = mimeToExt(req.file.mimetype)
     const filename = `${req.user!.id}-${Date.now()}${ext}`
 
@@ -76,11 +100,13 @@ router.post('/', requireAuth, uploadLimiter, upload.single('file'), async (req: 
         data: { publicUrl }
     } = supabase.storage.from('avatars').getPublicUrl(filename)
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
         where: { id: req.user!.id },
         data: { avatarUrl: publicUrl }
     })
-    await invalidate(userCacheKey(req.user!.id))
+    // Write-through, not invalidate — see consumer.ts's processThumbnailMessage
+    // for why an invalidate-only write races a concurrent GET /users/me poll.
+    await setJSON(userCacheKey(req.user!.id), withoutPassword(updatedUser), USER_CACHE_TTL_SECONDS)
 
     try {
         const ch = await getChannel()

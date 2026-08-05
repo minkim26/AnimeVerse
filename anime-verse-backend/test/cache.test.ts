@@ -52,12 +52,41 @@ describe('GET /users/me cache', () => {
             .set('Authorization', `Bearer ${user.token}`)
             .send({ oldPassword: 'test-password-123', newPassword: 'new-password-456' })
             .expect(204)
-        const callsAfterPatch = spy.mock.calls.length
 
-        await request(app).get('/users/me').set('Authorization', `Bearer ${user.token}`).expect(200)
-        expect(spy.mock.calls.length).toBe(callsAfterPatch + 1)
+        // A password change revokes tokens issued before it (see the next
+        // test), so the follow-up read needs a freshly issued token. JWT
+        // `iat` is second-granularity and the revocation check is inclusive
+        // (favoring rejecting an ambiguous same-second token over letting a
+        // possibly-stale one through), so cross a full second boundary
+        // before logging in again — otherwise this token could land in the
+        // exact same second as the revocation and get rejected too.
+        await new Promise((resolve) => setTimeout(resolve, 1100))
+        const loginRes = await request(app)
+            .post('/users/login')
+            .send({ email: user.email, password: 'new-password-456' })
+            .expect(200)
+        // Login itself does a findUnique (email lookup), separate from the
+        // cache-populating read this test is actually checking.
+        const callsAfterLogin = spy.mock.calls.length
+
+        await request(app).get('/users/me').set('Authorization', `Bearer ${loginRes.body.token}`).expect(200)
+        expect(spy.mock.calls.length).toBe(callsAfterLogin + 1)
 
         spy.mockRestore()
+        await user.cleanup()
+    })
+
+    it('rejects a token issued before a password change', async () => {
+        const user = await createTestUser(app)
+
+        await request(app)
+            .patch('/users/me/password')
+            .set('Authorization', `Bearer ${user.token}`)
+            .send({ oldPassword: 'test-password-123', newPassword: 'new-password-456' })
+            .expect(204)
+
+        await request(app).get('/users/me').set('Authorization', `Bearer ${user.token}`).expect(401)
+
         await user.cleanup()
     })
 })

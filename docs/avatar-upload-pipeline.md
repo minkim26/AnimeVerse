@@ -51,7 +51,7 @@ The client only sees the top row (`POST /avatar` → `201 { avatarUrl }`). Every
 
 ### 3. Frontend behavior (`src/pages/Profile.tsx`)
 
-- `AvatarUpload` calls `uploadAvatar(file)` (`src/services/avatar.ts`), which posts the file via `FormData` and a manual `fetch` call (not the shared `apiRequest` wrapper, since that wrapper always sets a JSON `Content-Type` header, which would break the multipart boundary).
+- `AvatarUpload` calls `uploadAvatar(file)` (`src/services/avatar.ts`), which posts the file via `FormData` through the shared `apiRequest` wrapper (`src/services/api.ts`) — `apiRequest` detects a `FormData` body and skips the JSON `Content-Type`/stringify step so the browser can set its own multipart boundary.
 - On success, `Profile.tsx` updates local state with the new `avatarUrl` and resets `avatarThumbnailUrl` to `null`.
 - While `avatarUrl` is set but `avatarThumbnailUrl` is still `null`, the UI shows "Generating thumbnail..." beneath the full-size image.
 - There is currently no polling or websocket to notify the frontend when the thumbnail becomes ready — a manual refresh (which re-fetches `GET /users/me`) is what picks up `avatarThumbnailUrl` once the consumer finishes. This is a known gap, not a bug: the pipeline was verified by uploading, waiting, then re-querying `/users/me` directly.

@@ -64,3 +64,25 @@ export const swipesLimiter = rateLimit({
     store: makeStore('rl:swipes:'),
     keyGenerator: perUserKey
 })
+
+/*
+ * watchlistLimiter and reviewsLimiter cap writes to each collection per
+ * authenticated user. Unlike swipes (a rapid-fire onboarding action),
+ * adding to a watchlist or writing a review is a deliberate, low-frequency
+ * action, so the limit is lower — this exists to bound abuse, not to be
+ * felt by a real user. Same shape for both, differing only in the Redis
+ * key prefix that keeps their counters separate.
+ */
+function makeCollectionLimiter(prefix: string): ReturnType<typeof rateLimit> {
+    return rateLimit({
+        windowMs: 60 * MINUTE,
+        limit: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        store: makeStore(prefix),
+        keyGenerator: perUserKey
+    })
+}
+
+export const watchlistLimiter = makeCollectionLimiter('rl:watchlist:')
+export const reviewsLimiter = makeCollectionLimiter('rl:reviews:')

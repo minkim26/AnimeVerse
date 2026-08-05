@@ -2,9 +2,21 @@ import redis from './redis.ts'
 
 export const QUOTES_CACHE_KEY = 'cache:quotes'
 export const TITLES_CACHE_KEY = 'cache:titles'
+export const USER_CACHE_TTL_SECONDS = 5 * 60
 
 export function userCacheKey(userId: number): string {
     return `cache:user:${userId}`
+}
+
+/*
+ * withoutPassword — the one place that decides what a "user" object looks
+ * like once it leaves this app, whether headed for an HTTP response or a
+ * Redis cache entry. Every call site that could otherwise cache or return
+ * a password hash routes through this instead of destructuring inline.
+ */
+export function withoutPassword<T extends { password: unknown }>(user: T): Omit<T, 'password'> {
+    const { password, ...rest } = user
+    return rest
 }
 
 export function preferencesCacheKey(userId: number): string {

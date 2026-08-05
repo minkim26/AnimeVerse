@@ -63,14 +63,17 @@ describe('avatar-thumbnails dead-letter routing', () => {
 })
 
 describe('processThumbnailMessage', () => {
-    it('resizes the original, updates avatarThumbnailUrl, and invalidates the user cache', async () => {
+    it('resizes the original and writes the fresh row (with the new avatarThumbnailUrl) into the user cache', async () => {
         const user = await createTestUser(app)
         await setJSON(userCacheKey(user.id), { stale: true }, 60)
 
         await processThumbnailMessage({ userId: user.id, filename: `${user.id}-123.png` })
 
         const cached = await redis.get(userCacheKey(user.id))
-        expect(cached).toBeNull()
+        expect(cached).not.toBeNull()
+        const parsed = JSON.parse(cached!)
+        expect(parsed.avatarThumbnailUrl).toBe('http://fake.test/avatar.png')
+        expect(parsed.password).toBeUndefined()
 
         await user.cleanup()
     })

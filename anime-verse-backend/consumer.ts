@@ -5,7 +5,7 @@ import http from 'http'
 
 import prisma from './lib/prisma.ts'
 import supabase from './lib/supabase.ts'
-import { invalidate, userCacheKey } from './lib/cache.ts'
+import { setJSON, userCacheKey, withoutPassword, USER_CACHE_TTL_SECONDS } from './lib/cache.ts'
 import { AVATAR_QUEUE, setupAvatarQueue } from './lib/queue.ts'
 
 const THUMBNAIL_SIZE = 128
@@ -45,11 +45,15 @@ export async function processThumbnailMessage({ userId, filename }: ThumbnailMes
         data: { publicUrl: thumbnailUrl }
     } = supabase.storage.from('avatar-thumbnails').getPublicUrl(thumbFilename)
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
         where: { id: userId },
         data: { avatarThumbnailUrl: thumbnailUrl }
     })
-    await invalidate(userCacheKey(userId))
+    // Write-through, not invalidate: an in-flight GET /users/me poll (the
+    // frontend polls this exact route while showing "Generating
+    // thumbnail...") can otherwise read-and-cache the pre-thumbnail row
+    // after this invalidation fires, serving stale data for the full TTL.
+    await setJSON(userCacheKey(userId), withoutPassword(updatedUser), USER_CACHE_TTL_SECONDS)
 
     console.log(`Thumbnail generated for user ${userId}`)
 }

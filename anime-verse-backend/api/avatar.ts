@@ -7,7 +7,7 @@ import sharp from 'sharp'
 import prisma from '../lib/prisma.ts'
 import supabase from '../lib/supabase.ts'
 import { requireAuth, type AuthenticatedRequest } from '../lib/auth.ts'
-import { invalidate, userCacheKey } from '../lib/cache.ts'
+import { setJSON, userCacheKey, withoutPassword, USER_CACHE_TTL_SECONDS } from '../lib/cache.ts'
 import { uploadLimiter } from '../lib/rateLimit.ts'
 import { AVATAR_QUEUE, setupAvatarQueue } from '../lib/queue.ts'
 
@@ -100,11 +100,13 @@ router.post('/', requireAuth, uploadLimiter, upload.single('file'), async (req: 
         data: { publicUrl }
     } = supabase.storage.from('avatars').getPublicUrl(filename)
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
         where: { id: req.user!.id },
         data: { avatarUrl: publicUrl }
     })
-    await invalidate(userCacheKey(req.user!.id))
+    // Write-through, not invalidate — see consumer.ts's processThumbnailMessage
+    // for why an invalidate-only write races a concurrent GET /users/me poll.
+    await setJSON(userCacheKey(req.user!.id), withoutPassword(updatedUser), USER_CACHE_TTL_SECONDS)
 
     try {
         const ch = await getChannel()

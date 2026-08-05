@@ -11,10 +11,16 @@
       Permissions-Policy — those need to be added as real response headers
       once a host exists (see anime-verse-backend/app.ts for the ones
       already set on the API's own responses).
+
+      style-src needs 'unsafe-inline': Vite injects <style> tags at runtime
+      in both dev and build (confirmed against Vite's docs), and a static
+      SPA with no per-request server templating can't generate the nonces
+      that would let script/style-src drop it. Strict nonce-based style-src
+      is the upgrade path once real server-side templating exists.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; font-src 'self'; connect-src 'self' https://graphql.anilist.co %VITE_API_URL%; object-src 'none'; frame-src 'none'; base-uri 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self'; connect-src 'self' https://graphql.anilist.co %VITE_API_URL%; object-src 'none'; frame-src 'none'; base-uri 'self'"
     />
   </head>
   <body>

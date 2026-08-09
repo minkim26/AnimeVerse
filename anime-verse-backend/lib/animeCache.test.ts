@@ -59,7 +59,7 @@ describe('upsertAnime', () => {
         expect(row?.title).toBe('First')
     })
 
-    it('refreshes a stale row (older than 7 days)', async () => {
+    it('still does not overwrite an existing row once it is old (no staleness refresh)', async () => {
         const id = randomAnimeId()
         createdId = id
 
@@ -69,6 +69,6 @@ describe('upsertAnime', () => {
         await upsertAnime({ id, title: 'Second', posterUrl: null, synopsis: '', tags: [{ name: 'Tragedy', rank: 60 }] })
 
         const row = await readAnime(id)
-        expect(row?.title).toBe('Second')
+        expect(row?.title).toBe('First')
     })
 })

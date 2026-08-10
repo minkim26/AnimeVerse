@@ -27,7 +27,8 @@ export function applyPageMeta({ title, description }: PageMetaOptions): void {
 }
 
 export default function usePageMeta(options: PageMetaOptions): void {
+  const { title, description } = options
   useEffect(() => {
-    applyPageMeta(options)
-  }, [options.title, options.description])
+    applyPageMeta({ title, description })
+  }, [title, description])
 }

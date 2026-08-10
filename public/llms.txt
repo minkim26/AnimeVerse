@@ -1,0 +1,9 @@
+# AnimeVerse
+
+> AnimeVerse is a personal/portfolio anime recommendation web app. Users swipe through a discovery deck to build a taste profile, then receive anime recommendations generated from taste-vector similarity search, alongside traditional browse/search/filter over AniList's catalog.
+
+This is a demo/resume project, not a commercial product. Public pages are the home page, login, signup, and privacy policy; the discovery deck, recommendations, preferences, and profile pages require creating a free account.
+
+## Notes for automated tools
+
+This site's robots.txt disallows bulk crawling by AI-training crawlers. This llms.txt is provided for a person explicitly pointing an assistant at this URL, not as an invitation to bulk-scrape the site.

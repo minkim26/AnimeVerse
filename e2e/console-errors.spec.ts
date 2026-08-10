@@ -6,6 +6,7 @@ function uniqueEmail(): string {
 
 test('no console or page errors during the primary signup-to-profile flow', async ({ page }) => {
   const errors: string[] = []
+  let filteredCount = 0
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return
     const text = msg.text()
@@ -16,7 +17,10 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
     // (swipe save, section load) to settle before navigating away specifically
     // so this filter stays a rare-noise safety net rather than something that
     // fires on every run; don't remove those waits to "simplify" this test.
-    if (text.startsWith('[Discover]') || text.startsWith('[Recommendations]')) return
+    if (text.startsWith('[Discover]') || text.startsWith('[Recommendations]')) {
+      filteredCount++
+      return
+    }
     errors.push(`console.error: ${text}`)
   })
   page.on('pageerror', (err) => {
@@ -58,7 +62,13 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
   await expect(page.getByRole('heading', { name: 'Update Your Preferences' })).toBeVisible()
 
   await page.goto('/profile')
-  await expect(page.getByRole('heading', { name: 'Profile' })).toBeVisible()
+  // exact: true — Profile also renders a "Profile Picture" h2 once the async
+  // GET /users/me resolves (see AvatarUpload, gated on `user &&`). Playwright's
+  // getByRole name match is substring by default, so an inexact match here is
+  // ambiguous exactly when that fetch has already resolved by the time this
+  // assertion polls — a pre-existing, timing-dependent locator collision, not
+  // a page bug.
+  await expect(page.getByRole('heading', { name: 'Profile', exact: true })).toBeVisible()
   // Profile has always rendered its own Logout button alongside the
   // persistent one in Navbar (pre-existing, intentional duplicate
   // affordance since the SPA rewrite) — scope to <main> so the locator
@@ -66,5 +76,9 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
   await page.getByRole('main').getByRole('button', { name: 'Logout' }).click()
   await page.waitForURL('**/login')
 
+  // Surfaced (not asserted on) so a CI log or local run shows at a glance
+  // whether the filter above is still a rare safety net or is quietly
+  // eating something on every run.
+  console.log(`[console-errors.spec] filtered ${filteredCount} known Discover/Recommendations message(s)`)
   expect(errors, errors.join('\n')).toEqual([])
 })

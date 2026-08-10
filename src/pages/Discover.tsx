@@ -7,6 +7,7 @@ import Footer from '../components/Footer.tsx'
 import { getPreferences } from '../services/preferences.ts'
 import { fetchDiscoverPool, animeTitle, animeSynopsis, type AniListAnime } from '../services/anilist.ts'
 import { postSwipe, getMySwipes, type SwipeAction } from '../services/swipes.ts'
+import usePageMeta from '../hooks/usePageMeta.ts'
 
 const DECK_SIZE = 20
 
@@ -74,6 +75,10 @@ function TooltipButton({ tooltip, className, children, ...buttonProps }: Tooltip
 }
 
 export default function Discover() {
+  usePageMeta({
+    title: 'Discover',
+    description: 'Swipe through anime to build your taste profile — every like, love, and skip helps AnimeVerse recommend better picks.',
+  })
   const [deck, setDeck] = useState<DeckState>({ status: 'loading' })
   const [index, setIndex] = useState(0)
   const [swipeStatus, setSwipeStatus] = useState<SwipeStatus>({ kind: 'idle' })

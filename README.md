@@ -100,7 +100,7 @@ npx tsx consumer.ts
 
 ```bash
 npm install
-cp .env.example .env              # VITE_API_URL, defaults to http://localhost:8000
+cp .env.example .env              # VITE_API_URL and VITE_SITE_URL, see Environment Variables below
 npm run dev                       # http://localhost:5173
 ```
 
@@ -125,6 +125,7 @@ npm run dev                       # http://localhost:5173
 | Variable | Purpose |
 |---|---|
 | `VITE_API_URL` | Base URL of the Express API (defaults to `http://localhost:8000`). |
+| `VITE_SITE_URL` | Canonical site origin used for `<link rel="canonical">`, Open Graph tags, and JSON-LD (defaults to `window.location.origin` at runtime if unset). Must be set to the real production domain before `npm run build` for an actual deploy — see the comment above it in `.env.example`. |
 
 ## Available Scripts
 

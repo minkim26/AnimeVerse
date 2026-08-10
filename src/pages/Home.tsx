@@ -3,6 +3,7 @@ import { ThumbsUp, TrendingUp, Clock, Shuffle } from 'lucide-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { isAuthenticated } from '../services/auth.ts'
+import usePageMeta from '../hooks/usePageMeta.ts'
 
 const FEATURES = [
   {
@@ -41,6 +42,11 @@ const FEATURE_LAYOUTS: { span: string; bg: string }[] = [
 ]
 
 export default function Home() {
+  usePageMeta({
+    title: 'Discover Anime Recommendations',
+    description:
+      "AnimeVerse recommends anime tailored to your taste — swipe through a discovery deck, then get personalized picks powered by taste-vector matching.",
+  })
   const loggedIn = isAuthenticated()
 
   return (

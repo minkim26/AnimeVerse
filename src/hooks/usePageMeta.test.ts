@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach } from 'vitest'
 import { applyPageMeta } from './usePageMeta.ts'
+import { SITE_URL } from '../lib/site.ts'
 
 beforeEach(() => {
   document.head.innerHTML = ''
@@ -31,7 +32,7 @@ describe('applyPageMeta', () => {
     window.history.pushState({}, '', '/login')
     applyPageMeta({ title: 'Login', description: 'Log in to AnimeVerse.' })
     const tag = document.querySelector('link[rel="canonical"]')
-    expect(tag?.getAttribute('href')).toBe(`${window.location.origin}/login`)
+    expect(tag?.getAttribute('href')).toBe(`${SITE_URL}/login`)
   })
 
   it('updates an existing canonical link instead of duplicating it', () => {
@@ -41,6 +42,6 @@ describe('applyPageMeta', () => {
     applyPageMeta({ title: 'Signup', description: 'Second.' })
     const tags = document.querySelectorAll('link[rel="canonical"]')
     expect(tags).toHaveLength(1)
-    expect(tags[0].getAttribute('href')).toBe(`${window.location.origin}/signup`)
+    expect(tags[0].getAttribute('href')).toBe(`${SITE_URL}/signup`)
   })
 })

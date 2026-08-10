@@ -4,8 +4,13 @@ import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { signUp } from '../services/auth.ts'
 import { ApiError } from '../services/api.ts'
+import usePageMeta from '../hooks/usePageMeta.ts'
 
 export default function Signup() {
+  usePageMeta({
+    title: 'Sign Up',
+    description: 'Create a free AnimeVerse account to start building your taste profile and get anime recommendations made for you.',
+  })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')

@@ -4,8 +4,13 @@ import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import { signIn } from '../services/auth.ts'
 import { ApiError } from '../services/api.ts'
+import usePageMeta from '../hooks/usePageMeta.ts'
 
 export default function Login() {
+  usePageMeta({
+    title: 'Log In',
+    description: 'Log in to AnimeVerse to pick up your personalized anime recommendations and continue where you left off.',
+  })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')

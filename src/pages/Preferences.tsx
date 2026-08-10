@@ -4,8 +4,13 @@ import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import GenreCheckboxGroup from '../components/GenreCheckboxGroup.tsx'
 import { getPreferences, savePreferences } from '../services/preferences.ts'
+import usePageMeta from '../hooks/usePageMeta.ts'
 
 export default function Preferences() {
+  usePageMeta({
+    title: 'Preferences',
+    description: 'Update your favorite genres and content settings to fine-tune the anime recommendations AnimeVerse gives you.',
+  })
   const [genres, setGenres] = useState<string[]>([])
   const [showAdultContent, setShowAdultContent] = useState(false)
   const [loading, setLoading] = useState(true)

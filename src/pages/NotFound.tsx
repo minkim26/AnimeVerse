@@ -1,8 +1,13 @@
 import { Link } from 'react-router'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
+import usePageMeta from '../hooks/usePageMeta.ts'
 
 export default function NotFound() {
+  usePageMeta({
+    title: 'Page Not Found',
+    description: "The page you're looking for doesn't exist. Head back to AnimeVerse to keep discovering anime.",
+  })
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />

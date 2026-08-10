@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import AnimeCard from '../components/AnimeCard.tsx'
 import { getPreferences } from '../services/preferences.ts'
+import usePageMeta from '../hooks/usePageMeta.ts'
 import {
   fetchAnimeByGenres,
   fetchTrendingNow,
@@ -86,6 +87,10 @@ const SECTION_KEYS = ['byGenre', 'trending', 'newReleases', 'random'] as const
 type SectionKey = (typeof SECTION_KEYS)[number]
 
 export default function Recommendations() {
+  usePageMeta({
+    title: 'Recommendations',
+    description: 'Browse anime recommendations picked for your taste, plus trending titles, new releases, and random discoveries.',
+  })
   const [byGenre, setByGenre] = useState<SectionState>({ status: 'loading' })
   const [trending, setTrending] = useState<SectionState>({ status: 'loading' })
   const [newReleases, setNewReleases] = useState<SectionState>({ status: 'loading' })

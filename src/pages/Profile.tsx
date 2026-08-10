@@ -11,6 +11,7 @@ import { getRandomQuote, type Quote } from '../services/quotes.ts'
 import { getRandomTitle, type Title } from '../services/titles.ts'
 import { fetchRandomAnime } from '../services/anilist.ts'
 import { uploadAvatar, pollForThumbnail } from '../services/avatar.ts'
+import usePageMeta from '../hooks/usePageMeta.ts'
 
 interface AvatarUploadProps {
   user: User
@@ -284,6 +285,10 @@ function RandomAnimeGenerator() {
 }
 
 export default function Profile() {
+  usePageMeta({
+    title: 'Profile',
+    description: "Manage your AnimeVerse account, avatar, and password, and revisit anime you've swiped on.",
+  })
   const [user, setUser] = useState<User | null>(null)
   const navigate = useNavigate()
 

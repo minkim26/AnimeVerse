@@ -1,7 +1,12 @@
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
+import usePageMeta from '../hooks/usePageMeta.ts'
 
 export default function PrivacyPolicy() {
+  usePageMeta({
+    title: 'Privacy Policy',
+    description: "Read AnimeVerse's privacy policy to learn how your account and usage information is collected, used, and protected.",
+  })
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />

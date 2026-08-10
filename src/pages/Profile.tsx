@@ -335,7 +335,7 @@ export default function Profile() {
             {(user.avatarThumbnailUrl ?? user.avatarUrl) && (
               <img
                 src={user.avatarThumbnailUrl ?? user.avatarUrl ?? undefined}
-                alt=""
+                alt="Your avatar"
                 className="w-16 h-16 rounded-full object-cover shrink-0"
               />
             )}

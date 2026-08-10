@@ -11,14 +11,11 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
     const text = msg.text()
     // Discover.tsx and Recommendations.tsx deliberately console.error() and
     // fall back to a safe UI state when a fetch fails, instead of throwing
-    // (see the comments next to those catch blocks). This test's own
-    // back-to-back page.goto() calls abort whatever fetch was still in
-    // flight on the page being left (e.g. the swipe POST right after
-    // clicking Like, or the AniList calls right after the Recommendations
-    // heading renders) — exactly the failure those handlers exist to catch
-    // and log rather than crash on. That's expected, documented behavior,
-    // not a bug, so these two known, intentional prefixes are excluded here
-    // rather than dropping the assertion.
+    // (see the comments next to those catch blocks) — e.g. if AniList is
+    // slow or rate-limited during a run. The test waits for each async step
+    // (swipe save, section load) to settle before navigating away specifically
+    // so this filter stays a rare-noise safety net rather than something that
+    // fires on every run; don't remove those waits to "simplify" this test.
     if (text.startsWith('[Discover]') || text.startsWith('[Recommendations]')) return
     errors.push(`console.error: ${text}`)
   })
@@ -44,9 +41,18 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
   await page.goto('/recommendations')
   await page.waitForURL('**/discover')
   await page.getByRole('button', { name: 'Like' }).click()
+  // Wait for the swipe POST to actually finish (Discover.tsx's role="status"
+  // region) before navigating away — page.goto() is a full navigation that
+  // tears down the SPA and aborts whatever fetch is still in flight, which
+  // would otherwise manufacture a spurious "[Discover] Failed to record
+  // swipe" error on every run instead of only under real network failure.
+  await page.getByText('Saved').waitFor()
 
   await page.goto('/recommendations')
   await expect(page.getByRole('heading', { name: 'Your Top Recommendations' })).toBeVisible()
+  // Same reasoning: let the four sections' AniList/preferences fetches
+  // settle (success or error) before navigating on, instead of racing them.
+  await expect(page.getByText('Loading...')).toHaveCount(0, { timeout: 15000 })
 
   await page.goto('/preferences')
   await expect(page.getByRole('heading', { name: 'Update Your Preferences' })).toBeVisible()

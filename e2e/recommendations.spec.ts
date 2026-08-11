@@ -30,4 +30,5 @@ test('signup then Recommendations page renders AniList-backed sections', async (
   await expect(page.getByRole('heading', { name: 'New Releases' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Random Recommendations' })).toBeVisible()
   await expect(page.locator('img').first()).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText('Failed to load this section.')).toHaveCount(0)
 })

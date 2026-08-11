@@ -12,6 +12,9 @@ node_modules/
 .env.production
 .env.testing
 
+# Local Docker Compose overrides (dev-machine-specific, never shipped)
+compose.override.yml
+
 # Prisma generated client
 anime-verse-backend/generated/
 

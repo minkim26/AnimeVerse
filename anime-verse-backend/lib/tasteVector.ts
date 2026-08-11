@@ -24,7 +24,7 @@ export function computeTasteVector(swipes: SwipedAnime[]): number[] | null {
     for (const { action, tasteVector } of swipes) {
         const weight = SWIPE_WEIGHT[action]
         for (let i = 0; i < VECTOR_DIMENSION; i++) {
-            sum[i] += weight * tasteVector[i]
+            sum[i]! += weight * tasteVector[i]!
         }
     }
     return sum.map((value) => value / swipes.length)

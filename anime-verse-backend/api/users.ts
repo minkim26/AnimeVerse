@@ -41,13 +41,24 @@ router.post('/', authLimiter, async (req, res) => {
 /*
  * POST /users/login — Authenticate a user and return a JWT.
  *
- * We return the same 401 whether the email doesn't exist or the password
- * is wrong — this avoids leaking which emails are registered.
+ * We return the same 401 whether the email doesn't exist, the password is
+ * wrong, or the request body fails validation (e.g. a password under 8
+ * characters) — this avoids leaking which emails are registered, and also
+ * avoids leaking *why* a login attempt failed. Unlike signup, where format
+ * feedback ("password must be at least 8 characters") is helpful and safe
+ * to show, on login it's a distinguishing signal an attacker could use to
+ * tell malformed input apart from a merely-wrong password. safeParse (not
+ * User.parse) is deliberate: a thrown ZodError would bubble to app.ts's
+ * error handler as a 400 with format-specific detail, defeating this.
  *
- * Returns: 200 { token } on success, 401 on invalid credentials
+ * Returns: 200 { token } on success, 401 on any other outcome
  */
 router.post('/login', authLimiter, async (req, res) => {
-    const { email, password } = User.parse(req.body)
+    const result = User.safeParse(req.body)
+    if (!result.success) {
+        return res.status(401).send({ error: 'Invalid credentials' })
+    }
+    const { email, password } = result.data
 
     const user = await prisma.user.findUnique({ where: { email } })
 

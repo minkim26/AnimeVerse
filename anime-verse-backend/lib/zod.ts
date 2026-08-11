@@ -1,17 +1,20 @@
 import * as z from 'zod'
 
 export const User = z.object({
-    email: z.email(),
-    password: z.string().min(8)
+    email: z.email({ error: 'Please enter a valid email address.' }),
+    password: z.string().min(8, { error: 'Password must be at least 8 characters.' })
 })
 
 export const UpdatePassword = z.object({
-    oldPassword: z.string().min(1),
-    newPassword: z.string().min(8)
+    oldPassword: z.string().min(1, { error: 'Please enter your current password.' }),
+    newPassword: z.string().min(8, { error: 'New password must be at least 8 characters.' })
 })
 
 export const Preferences = z.object({
-    genres: z.array(z.string().max(50)).max(50).default([]),
+    genres: z
+        .array(z.string().max(50, { error: 'Genre names must be 50 characters or less.' }))
+        .max(50, { error: 'You can select up to 50 genres.' })
+        .default([]),
     showAdultContent: z.boolean().default(false)
 })
 

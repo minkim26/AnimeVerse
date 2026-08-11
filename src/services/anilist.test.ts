@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   animeTitle,
   animeSynopsis,
-  fetchAnimeByGenres,
   fetchTrendingNow,
   fetchNewReleases,
   fetchRandomRecommendations,
@@ -133,18 +132,6 @@ describe('fetchMediaList failure modes', () => {
     )
 
     await expect(fetchTrendingNow()).rejects.toThrow('AniList returned an unexpected response shape.')
-  })
-})
-
-describe('fetchAnimeByGenres', () => {
-  it('sends the requested genres and returns the media list', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([{ id: 1 }]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const result = await fetchAnimeByGenres(['Action', 'Comedy'])
-
-    expect(result).toEqual([{ id: 1 }])
-    expect(lastRequestVariables(fetchMock).genre_in).toEqual(['Action', 'Comedy'])
   })
 })
 

@@ -25,6 +25,11 @@ export default function Login() {
       const from = location.state?.from
       navigate(from ?? '/profile')
     } catch (err) {
+      // Logged as well as rendered: an ApiError's message is safe to show
+      // as-is, but a non-ApiError (network failure, CORS block, the
+      // backend simply not responding) has no useful on-page detail —
+      // the console is where that gets diagnosed.
+      console.error('[Login] Failed to log in:', err)
       setError(err instanceof ApiError ? err.message : 'An error occurred during login. Please try again later.')
     }
   }

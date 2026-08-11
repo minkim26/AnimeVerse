@@ -31,7 +31,7 @@ function swipeBody(animeId: number) {
     return {
         animeId,
         action: 'LIKE',
-        anime: { title: 'Test Anime', posterUrl: 'https://example.com/poster.jpg', synopsis: 'A synopsis.', tags: [{ name: 'Isekai', rank: 80 }] }
+        anime: { title: 'Test Anime', posterUrl: 'https://example.com/poster.jpg', synopsis: 'A synopsis.', tags: [{ name: 'Isekai', rank: 80 }], isAdult: false }
     }
 }
 

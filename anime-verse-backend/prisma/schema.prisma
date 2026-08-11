@@ -89,6 +89,7 @@ model Anime {
     synopsis    String
     tags        Json
     tasteVector Unsupported("vector(335)")?
+    isAdult     Boolean  @default(false)
     updatedAt   DateTime @updatedAt
 
     swipes Swipe[]

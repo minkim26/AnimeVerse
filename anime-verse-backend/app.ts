@@ -36,7 +36,10 @@ app.use('/', api)
 
 app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (err instanceof z.ZodError) {
-        res.status(400).send({ error: z.prettifyError(err) })
+        // z.prettifyError() is meant for CLI/log output (bullet points, "at
+        // <path>" arrows) — not a sentence a user should see on a form. Each
+        // issue's own .message is already prose; join them plainly instead.
+        res.status(400).send({ error: err.issues.map((issue) => issue.message).join(' ') })
     } else if (
         err instanceof Prisma.PrismaClientValidationError ||
         (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003')

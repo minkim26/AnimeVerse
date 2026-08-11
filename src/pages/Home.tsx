@@ -9,7 +9,7 @@ const FEATURES = [
   {
     icon: ThumbsUp,
     title: 'Personalized Recommendations',
-    description: 'Get tailored anime recommendations based on your preferred genres.',
+    description: 'Get tailored anime recommendations based on what you swipe.',
   },
   {
     icon: TrendingUp,

@@ -5,6 +5,7 @@ export interface AniListAnime {
   description: string | null
   genres: string[]
   tags: { name: string; rank: number }[]
+  isAdult?: boolean
 }
 
 export function animeTitle(anime: AniListAnime): string {
@@ -47,6 +48,7 @@ const MEDIA_LIST_QUERY = `
         description(asHtml: false)
         genres
         tags { name rank }
+        isAdult
       }
     }
   }
@@ -148,22 +150,9 @@ export function clearMediaListCache(): void {
   mediaListCache.clear()
 }
 
-export async function fetchAnimeByGenres(
-  genres: string[],
-  showAdultContent = false,
-): Promise<AniListAnime[]> {
-  return fetchMediaList({
-    page: 1,
-    perPage: 12,
-    genre_in: genres,
-    sort: ['POPULARITY_DESC'],
-    ...adultContentFilter(showAdultContent),
-  })
-}
-
 // Cached: this is the same data for every user at a given moment, unlike
-// fetchAnimeByGenres (personalized) or fetchRandomRecommendations (meant to
-// vary), so repeat navigation within CACHE_TTL_MS costs zero AniList requests.
+// fetchRandomRecommendations (meant to vary), so repeat navigation within
+// CACHE_TTL_MS costs zero AniList requests.
 export async function fetchTrendingNow(showAdultContent = false): Promise<AniListAnime[]> {
   return cachedFetchMediaList(`trending:${showAdultContent}`, {
     page: 1,

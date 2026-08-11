@@ -4,9 +4,9 @@ import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
 import AnimeCard from '../components/AnimeCard.tsx'
 import { getPreferences } from '../services/preferences.ts'
+import { getForYouRecommendations } from '../services/recommendations.ts'
 import usePageMeta from '../hooks/usePageMeta.ts'
 import {
-  fetchAnimeByGenres,
   fetchTrendingNow,
   fetchNewReleases,
   fetchRandomRecommendations,
@@ -134,16 +134,16 @@ export default function Recommendations() {
     }
 
     // Preferences are fetched once and fanned out to all four sections so the
-    // adult-content setting applies everywhere, not just the genre-based one.
-    // A failed preferences fetch falls back to the safe (hidden) default
-    // rather than leaving the whole page stuck loading.
+    // adult-content setting applies everywhere. A failed preferences fetch
+    // falls back to the safe (hidden) default rather than leaving the whole
+    // page stuck loading.
     getPreferences()
       .catch((err: unknown) => {
         console.error('[Recommendations] Failed to load preferences, defaulting to adult content hidden:', err)
         return { genres: [], showAdultContent: false }
       })
       .then((prefs) => {
-        load('For You', () => fetchAnimeByGenres(prefs.genres, prefs.showAdultContent), setByGenre)
+        load('For You', () => getForYouRecommendations(), setByGenre)
         load('Trending Now', () => fetchTrendingNow(prefs.showAdultContent), setTrending)
         load('New Releases', () => fetchNewReleases(prefs.showAdultContent), setNewReleases)
         load('Random Recommendations', () => fetchRandomRecommendations(prefs.showAdultContent), setRandom)

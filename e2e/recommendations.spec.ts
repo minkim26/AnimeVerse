@@ -30,6 +30,10 @@ test('signup then Recommendations page renders AniList-backed sections', async (
   await expect(page.getByRole('heading', { name: 'New Releases' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Random Recommendations' })).toBeVisible()
   await expect(page.locator('img').first()).toBeVisible({ timeout: 15000 })
+  // Gate on the section actually leaving its loading state — otherwise a slow
+  // For You request could still be "loading" when the assertion below runs,
+  // passing even if the section is broken. Same pattern as console-errors.spec.ts.
+  await expect(page.getByText('Loading...')).toHaveCount(0, { timeout: 15000 })
   const forYouSection = page.locator('section').filter({ has: page.getByRole('heading', { name: 'For You' }) })
   await expect(forYouSection.locator('p[class*="color-error"]')).toHaveCount(0)
 })

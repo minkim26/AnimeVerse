@@ -20,7 +20,9 @@ export async function postSwipe(anime: AniListAnime, action: SwipeAction): Promi
         posterUrl: anime.coverImage.large ?? anime.coverImage.medium ?? null,
         synopsis: animeSynopsis(anime),
         tags: anime.tags,
-        isAdult: anime.isAdult ?? false,
+        // Broadened past AniList's own flag to also cover the Ecchi genre tag — see
+        // adultContentFilter's comment in anilist.ts for why both are needed.
+        isAdult: (anime.isAdult ?? false) || anime.genres.includes('Ecchi'),
       },
     },
   })

@@ -9,7 +9,7 @@ import usePageMeta from '../hooks/usePageMeta.ts'
 export default function Preferences() {
   usePageMeta({
     title: 'Preferences',
-    description: 'Update your favorite genres and content settings to fine-tune the anime recommendations AnimeVerse gives you.',
+    description: 'Update your favorite genres and adult-content setting for your AnimeVerse profile.',
   })
   const [genres, setGenres] = useState<string[]>([])
   const [showAdultContent, setShowAdultContent] = useState(false)
@@ -55,7 +55,8 @@ export default function Preferences() {
           Update Your Preferences
         </h1>
         <p className="text-[var(--color-muted)] mb-8">
-          Select the genres you enjoy to better configure your recommendation settings.
+          Select the genres you enjoy for your profile, and choose whether adult content shows up in your
+          recommendations.
         </p>
 
         {loading ? (
@@ -81,8 +82,8 @@ export default function Preferences() {
             </label>
 
             <p className="text-xs text-[var(--color-muted)] mt-6">
-              Updating your preferences will change the recommendations you receive. The more preferences you
-              select, the broader your recommendations will be.
+              Genres are saved to your profile. Your adult-content setting applies across Discover and your
+              recommendations.
             </p>
 
             <button

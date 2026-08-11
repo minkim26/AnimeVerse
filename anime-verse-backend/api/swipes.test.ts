@@ -9,11 +9,11 @@ function randomAnimeId(): number {
     return Math.floor(Math.random() * 1_000_000_000) + 1_000_000_000
 }
 
-function swipeBody(animeId: number, action: 'SKIP' | 'LIKE' | 'LOVE') {
+function swipeBody(animeId: number, action: 'SKIP' | 'LIKE' | 'LOVE', isAdult = false) {
     return {
         animeId,
         action,
-        anime: { title: 'Test Anime', posterUrl: 'https://example.com/poster.jpg', synopsis: 'A synopsis.', tags: [{ name: 'Isekai', rank: 80 }] }
+        anime: { title: 'Test Anime', posterUrl: 'https://example.com/poster.jpg', synopsis: 'A synopsis.', tags: [{ name: 'Isekai', rank: 80 }], isAdult }
     }
 }
 
@@ -53,6 +53,23 @@ describe('POST /swipes', () => {
         expect(res.status).toBe(201)
         const cached = await prisma.anime.findUnique({ where: { id: animeId } })
         expect(cached?.title).toBe('Test Anime')
+
+        await user.cleanup()
+    })
+
+    it('caches whether the anime is adult content', async () => {
+        const user = await createTestUser(app)
+        const animeId = randomAnimeId()
+        createdAnimeIds.push(animeId)
+
+        await request(app)
+            .post('/swipes')
+            .set('Authorization', `Bearer ${user.token}`)
+            .send(swipeBody(animeId, 'LIKE', true))
+            .expect(201)
+
+        const cached = await prisma.anime.findUnique({ where: { id: animeId } })
+        expect(cached?.isAdult).toBe(true)
 
         await user.cleanup()
     })

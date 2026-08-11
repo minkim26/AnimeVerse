@@ -43,6 +43,7 @@ export const Swipe = z.object({
                     rank: z.number().min(0).max(100)
                 })
             )
-            .max(100)
+            .max(100),
+        isAdult: z.boolean()
     })
 })

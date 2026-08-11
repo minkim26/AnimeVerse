@@ -23,7 +23,8 @@ router.post('/', requireAuth, swipesLimiter, async (req: AuthenticatedRequest, r
         title: data.anime.title,
         posterUrl: data.anime.posterUrl,
         synopsis: data.anime.synopsis,
-        tags: data.anime.tags
+        tags: data.anime.tags,
+        isAdult: data.anime.isAdult
     })
 
     const swipe = await prisma.swipe.upsert({

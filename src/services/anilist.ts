@@ -5,6 +5,7 @@ export interface AniListAnime {
   description: string | null
   genres: string[]
   tags: { name: string; rank: number }[]
+  isAdult?: boolean
 }
 
 export function animeTitle(anime: AniListAnime): string {
@@ -47,6 +48,7 @@ const MEDIA_LIST_QUERY = `
         description(asHtml: false)
         genres
         tags { name rank }
+        isAdult
       }
     }
   }

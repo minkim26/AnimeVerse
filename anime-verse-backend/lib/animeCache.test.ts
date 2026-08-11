@@ -9,8 +9,8 @@ function randomAnimeId(): number {
 }
 
 async function readAnime(id: number) {
-    const rows = await prisma.$queryRaw<{ title: string; tags: unknown; vector: string }[]>`
-        SELECT title, tags, "tasteVector"::text AS vector FROM "Anime" WHERE id = ${id}
+    const rows = await prisma.$queryRaw<{ title: string; tags: unknown; vector: string; isAdult: boolean }[]>`
+        SELECT title, tags, "tasteVector"::text AS vector, "isAdult" FROM "Anime" WHERE id = ${id}
     `
     return rows[0] ?? null
 }
@@ -18,12 +18,6 @@ async function readAnime(id: number) {
 describe('upsertAnime', () => {
     let createdId: number | null = null
 
-    // Canary: Task 1's migration hardcodes the "tasteVector" column as
-    // vector(335) as a literal, since Postgres has no way to read
-    // VECTOR_DIMENSION from tagVector.ts. Nothing else ties them together,
-    // so if data/anilistTags.json is ever regenerated with a different tag
-    // count, this fails loudly here instead of surfacing as a Postgres
-    // "different vector dimensions" error deep inside a swipe request.
     it('keeps VECTOR_DIMENSION in sync with the migration\'s hardcoded vector(335)', () => {
         expect(VECTOR_DIMENSION).toBe(335)
     })
@@ -40,7 +34,7 @@ describe('upsertAnime', () => {
         createdId = id
         const tags = [{ name: 'Isekai', rank: 92 }]
 
-        await upsertAnime({ id, title: 'Test Anime', posterUrl: 'poster.jpg', synopsis: 'A synopsis.', tags })
+        await upsertAnime({ id, title: 'Test Anime', posterUrl: 'poster.jpg', synopsis: 'A synopsis.', tags, isAdult: false })
 
         const row = await readAnime(id)
         expect(row?.title).toBe('Test Anime')
@@ -48,25 +42,36 @@ describe('upsertAnime', () => {
         expect(row?.vector).toBe(expectedVector)
     })
 
+    it('stores isAdult as given on creation', async () => {
+        const id = randomAnimeId()
+        createdId = id
+
+        await upsertAnime({ id, title: 'Adult Anime', posterUrl: null, synopsis: '', tags: [], isAdult: true })
+
+        const row = await readAnime(id)
+        expect(row?.isAdult).toBe(true)
+    })
+
     it('does not overwrite a fresh row on a second call with different tags', async () => {
         const id = randomAnimeId()
         createdId = id
 
-        await upsertAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: [{ name: 'Isekai', rank: 92 }] })
-        await upsertAnime({ id, title: 'Second', posterUrl: null, synopsis: '', tags: [{ name: 'Tragedy', rank: 60 }] })
+        await upsertAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: [{ name: 'Isekai', rank: 92 }], isAdult: false })
+        await upsertAnime({ id, title: 'Second', posterUrl: null, synopsis: '', tags: [{ name: 'Tragedy', rank: 60 }], isAdult: true })
 
         const row = await readAnime(id)
         expect(row?.title).toBe('First')
+        expect(row?.isAdult).toBe(false)
     })
 
     it('still does not overwrite an existing row once it is old (no staleness refresh)', async () => {
         const id = randomAnimeId()
         createdId = id
 
-        await upsertAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: [{ name: 'Isekai', rank: 92 }] })
+        await upsertAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: [{ name: 'Isekai', rank: 92 }], isAdult: false })
         await prisma.$executeRaw`UPDATE "Anime" SET "updatedAt" = now() - interval '8 days' WHERE id = ${id}`
 
-        await upsertAnime({ id, title: 'Second', posterUrl: null, synopsis: '', tags: [{ name: 'Tragedy', rank: 60 }] })
+        await upsertAnime({ id, title: 'Second', posterUrl: null, synopsis: '', tags: [{ name: 'Tragedy', rank: 60 }], isAdult: true })
 
         const row = await readAnime(id)
         expect(row?.title).toBe('First')

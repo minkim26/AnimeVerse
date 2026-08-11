@@ -20,6 +20,7 @@ export async function postSwipe(anime: AniListAnime, action: SwipeAction): Promi
         posterUrl: anime.coverImage.large ?? anime.coverImage.medium ?? null,
         synopsis: animeSynopsis(anime),
         tags: anime.tags,
+        isAdult: anime.isAdult ?? false,
       },
     },
   })

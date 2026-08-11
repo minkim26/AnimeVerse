@@ -9,13 +9,15 @@ const SWIPE_WEIGHT: Record<SwipedAnime['action'], number> = { LOVE: 2, LIKE: 1, 
 
 /*
  * computeTasteVector aggregates a user's swiped anime into one vector: a
- * weighted average, weighted by how strongly each swipe action signals
- * taste (LOVE > LIKE > SKIP as negative signal). Cosine distance is
- * scale-invariant, so the result is never normalized to unit length — only
- * its direction matters to the nearest-neighbor query that consumes it.
- * Returns null for zero swipes; mandatory onboarding means this shouldn't
- * happen in practice, but the endpoint that calls this treats it as "no
- * recommendations yet" rather than risking a divide-by-zero.
+ * weighted sum, weighted by how strongly each swipe action signals taste
+ * (LOVE > LIKE > SKIP as negative signal). Not divided into an average —
+ * cosine distance (the only consumer, in the recommendation query) is
+ * scale-invariant, so dividing by swipe count would change every
+ * dimension's magnitude without changing its direction or the resulting
+ * ranking. Nor is the result normalized to unit length, for the same
+ * reason. Returns null for zero swipes; mandatory onboarding means this
+ * shouldn't happen in practice, but the endpoint that calls this treats it
+ * as "no recommendations yet" rather than risking a divide-by-zero.
  */
 export function computeTasteVector(swipes: SwipedAnime[]): number[] | null {
     if (swipes.length === 0) return null
@@ -27,5 +29,5 @@ export function computeTasteVector(swipes: SwipedAnime[]): number[] | null {
             sum[i]! += weight * tasteVector[i]!
         }
     }
-    return sum.map((value) => value / swipes.length)
+    return sum
 }

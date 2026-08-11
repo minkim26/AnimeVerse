@@ -17,13 +17,13 @@ describe('computeTasteVector', () => {
         expect(result).toHaveLength(VECTOR_DIMENSION)
     })
 
-    it('weights LOVE more heavily than LIKE and averages across swipes', () => {
+    it('weights LOVE more heavily than LIKE', () => {
         const result = computeTasteVector([
             { action: 'LOVE', tasteVector: uniformVector(1) },
             { action: 'LIKE', tasteVector: uniformVector(1) },
         ])
-        // (2*1 + 1*1) / 2 = 1.5 in every dimension
-        expect(result?.[0]).toBeCloseTo(1.5)
+        // 2*1 + 1*1 = 3 in every dimension
+        expect(result?.[0]).toBeCloseTo(3)
     })
 
     it('weights SKIP as negative signal', () => {
@@ -40,8 +40,8 @@ describe('computeTasteVector', () => {
             { action: 'LIKE', tasteVector: a },
             { action: 'LIKE', tasteVector: b },
         ])
-        expect(result?.[0]).toBeCloseTo(0.5)
-        expect(result?.[1]).toBeCloseTo(0.5)
+        expect(result?.[0]).toBeCloseTo(1)
+        expect(result?.[1]).toBeCloseTo(1)
         expect(result?.[2]).toBeCloseTo(0)
     })
 })

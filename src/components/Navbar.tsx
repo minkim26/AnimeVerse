@@ -53,8 +53,8 @@ export default function Navbar() {
               <Link to="/preferences" className={linkClass('/preferences')}>
                 Preferences
               </Link>
-              <Link to="/recommendations" className={linkClass('/recommendations')}>
-                Recommendations
+              <Link to="/explore" className={linkClass('/explore')}>
+                Explore
               </Link>
               <Link to="/profile" className={linkClass('/profile')}>
                 Profile
@@ -94,8 +94,8 @@ export default function Navbar() {
               <Link to="/preferences" className={mobileLinkClass('/preferences')} onClick={closeMenu}>
                 Preferences
               </Link>
-              <Link to="/recommendations" className={mobileLinkClass('/recommendations')} onClick={closeMenu}>
-                Recommendations
+              <Link to="/explore" className={mobileLinkClass('/explore')} onClick={closeMenu}>
+                Explore
               </Link>
               <Link to="/profile" className={mobileLinkClass('/profile')} onClick={closeMenu}>
                 Profile

@@ -3,7 +3,7 @@ import Home from './pages/Home.tsx'
 import Login from './pages/Login.tsx'
 import Signup from './pages/Signup.tsx'
 import Preferences from './pages/Preferences.tsx'
-import Recommendations from './pages/Recommendations.tsx'
+import Explore from './pages/Explore.tsx'
 import Profile from './pages/Profile.tsx'
 import PrivacyPolicy from './pages/PrivacyPolicy.tsx'
 import NotFound from './pages/NotFound.tsx'
@@ -51,11 +51,11 @@ export default function App() {
           }
         />
         <Route
-          path="/recommendations"
+          path="/explore"
           element={
             <ProtectedRoute>
               <RequireOnboarding>
-                <Recommendations />
+                <Explore />
               </RequireOnboarding>
             </ProtectedRoute>
           }

@@ -37,7 +37,7 @@ export default function Preferences() {
     setSaving(true)
     try {
       await savePreferences({ genres, showAdultContent })
-      navigate('/recommendations')
+      navigate('/explore')
     } finally {
       setSaving(false)
     }

@@ -257,7 +257,7 @@ export default function Discover() {
         {deck.status === 'ready' && !current && (
           <div className="surface-card w-full p-8 text-center">
             <p className="text-[var(--color-ink)] font-medium mb-4">That's the deck for now.</p>
-            <Link to="/recommendations" className="btn btn-accent px-6 py-3 text-sm no-underline">
+            <Link to="/explore" className="btn btn-accent px-6 py-3 text-sm no-underline">
               See your recommendations
             </Link>
           </div>

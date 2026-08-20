@@ -108,8 +108,9 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
   // race. Add an AbortController per fetch if this becomes visible in
   // practice; the 400ms debounce already makes it unlikely.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: shows the loading state immediately on any filter change, while only the fetchBrowseAnime call itself is debounced 400ms below.
+    setStatus('loading')
     const timer = setTimeout(() => {
-      setStatus('loading')
       setPage(1)
       fetchBrowseAnime({ page: 1, genres: selectedGenres, sort, search: searchText, showAdultContent })
         .then(({ anime, hasNextPage: next }) => {

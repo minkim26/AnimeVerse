@@ -92,6 +92,7 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
 
   const visibleGenres = showAdultContent ? BROWSE_GENRES : BROWSE_GENRES.filter((g) => g !== 'Ecchi')
 
@@ -110,6 +111,7 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: shows the loading state immediately on any filter change, while only the fetchBrowseAnime call itself is debounced 400ms below.
     setStatus('loading')
+    setLoadMoreError(null)
     const timer = setTimeout(() => {
       setPage(1)
       fetchBrowseAnime({ page: 1, genres: selectedGenres, sort, search: searchText, showAdultContent })
@@ -130,6 +132,7 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
   function loadMore() {
     const nextPage = page + 1
     setLoadingMore(true)
+    setLoadMoreError(null)
     fetchBrowseAnime({ page: nextPage, genres: selectedGenres, sort, search: searchText, showAdultContent })
       .then(({ anime, hasNextPage: next }) => {
         setResults((prev) => {
@@ -141,8 +144,11 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
       })
       .catch((err: unknown) => {
         console.error('[Explore] Browse & Search failed to load more:', err)
-        setErrorMessage(err instanceof Error ? err.message : 'Failed to load more results.')
-        setStatus('error')
+        // Deliberately not setErrorMessage/setStatus('error') here: that
+        // branch replaces the whole results grid, discarding everything
+        // already loaded. Load More failing (most likely AniList's 429)
+        // should leave the existing results visible with an inline error.
+        setLoadMoreError(err instanceof Error ? err.message : 'Failed to load more results.')
       })
       .finally(() => setLoadingMore(false))
   }
@@ -220,7 +226,7 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
             ))}
           </div>
           {(hasNextPage || sort === 'Shuffle') && (
-            <div className="flex justify-center mt-6">
+            <div className="flex flex-col items-center gap-2 mt-6">
               <button
                 type="button"
                 onClick={loadMore}
@@ -229,6 +235,7 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
               >
                 {loadingMore ? 'Loading...' : 'Load More'}
               </button>
+              {loadMoreError && <p className="text-xs text-[var(--color-error)]">{loadMoreError}</p>}
             </div>
           )}
         </>

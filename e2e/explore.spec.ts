@@ -49,7 +49,11 @@ test('signup then Explore page renders For You and Browse & Search', async ({ pa
 
   // Load More appends results without a duplicate React key — a duplicate
   // would surface as a console error, asserted separately in
-  // console-errors.spec.ts.
+  // console-errors.spec.ts. Runs before the search below: Action + Newest
+  // still has a deep results pool, so hasNextPage is true and the button is
+  // actually there to click. A search narrow enough to match Load More's
+  // rationale ("depends on the last-applied filter state") could easily
+  // leave zero results and skip this whole block.
   const loadMoreButton = browseSection.getByRole('button', { name: 'Load More' })
   if (await loadMoreButton.isVisible()) {
     const countBefore = await browseSection.locator('img').count()
@@ -58,4 +62,9 @@ test('signup then Explore page renders For You and Browse & Search', async ({ pa
     const countAfter = await browseSection.locator('img').count()
     expect(countAfter).toBeGreaterThan(countBefore)
   }
+
+  // Text search re-issues the debounced request too.
+  await browseSection.getByLabel('Search titles').fill('Frieren')
+  await expect(page.getByText('Loading...')).toHaveCount(0, { timeout: 15000 })
+  await expect(browseSection.locator('p[class*="color-error"]')).toHaveCount(0)
 })

@@ -311,6 +311,16 @@ describe('fetchBrowseAnime caching', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  it('treats the same genres selected in a different order as the same cache entry', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 1, genres: ['Action', 'Comedy'], sort: 'Popularity', search: '', showAdultContent: false })
+    await fetchBrowseAnime({ page: 1, genres: ['Comedy', 'Action'], sort: 'Popularity', search: '', showAdultContent: false })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('never caches Shuffle results, even with identical options', async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
     vi.stubGlobal('fetch', fetchMock)

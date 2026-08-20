@@ -234,7 +234,10 @@ export async function fetchBrowseAnime(
     page: isShuffle ? randomPage() : opts.page,
     perPage: BROWSE_PER_PAGE,
     sort: [isShuffle ? 'POPULARITY_DESC' : BROWSE_SORTS[opts.sort]],
-    ...(opts.genres.length > 0 ? { genre_in: opts.genres } : {}),
+    // Sorted so click order (Action-then-Comedy vs. Comedy-then-Action) maps
+    // to the same cache key. genre_in is an unordered set filter to AniList,
+    // so this doesn't change what's requested, only the cache key's stability.
+    ...(opts.genres.length > 0 ? { genre_in: [...opts.genres].sort() } : {}),
     ...(trimmedSearch ? { search: trimmedSearch } : {}),
     ...adultContentFilter(opts.showAdultContent),
   }

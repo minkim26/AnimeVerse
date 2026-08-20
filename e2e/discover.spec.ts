@@ -19,17 +19,17 @@ test('a new user is redirected to Discover before reaching Recommendations, and 
   await page.getByRole('button', { name: 'Login' }).click()
 
   await page.waitForURL('**/profile')
-  await page.goto('/recommendations')
+  await page.goto('/explore')
   await expect(page).toHaveURL(/\/discover$/)
 
   await expect(page.getByRole('heading', { name: 'Swipe to build your taste profile' })).toBeVisible()
   await page.getByRole('button', { name: 'Like' }).click({ timeout: 15000 })
 
-  await page.goto('/recommendations')
+  await page.goto('/explore')
   // Asserting on rendered content rather than the URL: RequireOnboarding
   // shows a brief loading shell while its GET /swipes/me check is in
-  // flight, so the URL reads "/recommendations" for a beat even on a run
+  // flight, so the URL reads "/explore" for a beat even on a run
   // where the gate is about to redirect. The heading only appears once the
   // gate has actually let the page through.
-  await expect(page.getByRole('heading', { name: 'Your Top Recommendations' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Explore', exact: true })).toBeVisible()
 })

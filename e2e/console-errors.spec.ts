@@ -10,14 +10,14 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
   page.on('console', (msg) => {
     if (msg.type() !== 'error') return
     const text = msg.text()
-    // Discover.tsx and Recommendations.tsx deliberately console.error() and
+    // Discover.tsx and Explore.tsx deliberately console.error() and
     // fall back to a safe UI state when a fetch fails, instead of throwing
     // (see the comments next to those catch blocks) — e.g. if AniList is
     // slow or rate-limited during a run. The test waits for each async step
     // (swipe save, section load) to settle before navigating away specifically
     // so this filter stays a rare-noise safety net rather than something that
     // fires on every run; don't remove those waits to "simplify" this test.
-    if (text.startsWith('[Discover]') || text.startsWith('[Recommendations]')) {
+    if (text.startsWith('[Discover]') || text.startsWith('[Explore]')) {
       filteredCount++
       return
     }
@@ -42,7 +42,7 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
   await page.getByRole('button', { name: 'Login' }).click()
 
   await page.waitForURL('**/profile')
-  await page.goto('/recommendations')
+  await page.goto('/explore')
   await page.waitForURL('**/discover')
   await page.getByRole('button', { name: 'Like' }).click()
   // Wait for the swipe POST to actually finish (Discover.tsx's role="status"
@@ -52,8 +52,8 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
   // swipe" error on every run instead of only under real network failure.
   await page.getByText('Saved').waitFor()
 
-  await page.goto('/recommendations')
-  await expect(page.getByRole('heading', { name: 'Your Top Recommendations' })).toBeVisible()
+  await page.goto('/explore')
+  await expect(page.getByRole('heading', { name: 'Explore', exact: true })).toBeVisible()
   // Same reasoning: let the four sections' AniList/preferences fetches
   // settle (success or error) before navigating on, instead of racing them.
   await expect(page.getByText('Loading...')).toHaveCount(0, { timeout: 15000 })

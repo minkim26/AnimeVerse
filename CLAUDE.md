@@ -42,6 +42,7 @@ AnimeVerse is an anime recommendation web app: a React 19 + Vite + TypeScript SP
 - `Preference.genres` is currently display/edit-only: saved via `POST /preferences` and shown back on `Preferences.tsx`/`Profile.tsx`, but no longer consumed by any recommendation or Discover logic — that's now driven entirely by swipes and `showAdultContent`. Planned removal in a future pass.
 - `Recommendations.tsx` was renamed to `Explore.tsx` (route `/recommendations` → `/explore`) once its "Browse & Search" section shipped; there's no redirect from the old path since no production deployment exists to have indexed or bookmarked it.
 - Explore's "Browse & Search" section queries AniList directly, same as Discover's swipe pool and Profile's random-anime widget — there's still no backend endpoint for browsing. Its results are cached client-side (`src/services/anilist.ts`'s `mediaListCache`, 5-minute TTL, keyed on the full filter combination — selected genres are sorted before building that key so toggling chips in a different order still hits the same cache entry) and its filter changes are debounced 400ms; both exist to reduce request volume under repeated filter changes, though neither guarantees staying under AniList's 30 req/min limit under sustained rapid clicking (each settled filter state still fires its own request, and there's no in-flight dedupe or 429 backoff beyond surfacing a readable error). The "Shuffle" sort is this app's own sentinel (not a real AniList `MediaSort`) and deliberately bypasses that cache, since a repeat call should sample a new random page, not repeat the last one.
+- `GET /recommendations/for-you` excludes every anime the caller has already swiped from its candidate pool. Since `Anime` only gains rows through swipes (see above), a fresh or low-traffic database can end up with a candidate pool smaller than any one user's own swipe history, in which case For You legitimately has nothing left to recommend and shows its empty state. This isn't a bug in the query; it's a cold-start property of a cache that only grows from user activity. `anime-verse-backend/scripts/seed-anime-cache.ts` (see Common Commands) fixes it by pre-populating the cache directly from AniList, without requiring swipes.
 
 ## Writing Style
 
@@ -81,6 +82,7 @@ npm install
 npm run initdb     # prisma migrate deploy && prisma generate, then seeds Quote/Title
 npm run dev        # tsx watch server.ts, http://localhost:8000
 npx tsx consumer.ts  # run separately to process avatar-thumbnail jobs; needs a local RabbitMQ + Redis
+npx tsx scripts/seed-anime-cache.ts  # pre-populates the Anime cache from AniList so For You has candidates on a fresh DB; safe to rerun, not wired into initdb
 ```
 
 To exercise the full app (especially the profile page's avatar upload), the API, Postgres, RabbitMQ, Redis, and the consumer must all be running — `docker compose up` is the simplest way to get all five at once.

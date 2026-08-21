@@ -71,7 +71,7 @@ export default function Home() {
             </p>
             <div>
               <Link
-                to={loggedIn ? '/recommendations' : '/signup'}
+                to={loggedIn ? '/explore' : '/signup'}
                 className="btn btn-accent px-8 py-3 text-base no-underline w-fit"
               >
                 {loggedIn ? 'View Recommendations' : 'Get Started'}
@@ -132,7 +132,7 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             {loggedIn ? (
-              <Link to="/recommendations" className="btn btn-accent px-8 py-3 text-base no-underline">
+              <Link to="/explore" className="btn btn-accent px-8 py-3 text-base no-underline">
                 View Recommendations
               </Link>
             ) : (

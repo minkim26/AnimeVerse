@@ -2,18 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   animeTitle,
   animeSynopsis,
-  fetchTrendingNow,
-  fetchNewReleases,
-  fetchRandomRecommendations,
+  fetchBrowseAnime,
   fetchRandomAnime,
   fetchDiscoverPool,
   clearMediaListCache,
   type AniListAnime,
 } from './anilist.ts'
 
-// fetchTrendingNow/fetchNewReleases are cached; without this, whichever test
-// runs first would populate the cache and every later test would silently
-// get its result back instead of hitting the mocked fetch.
+// fetchBrowseAnime's non-Shuffle results are cached; without this, whichever
+// test runs first would populate the cache and every later test would
+// silently get its result back instead of hitting the mocked fetch.
 beforeEach(() => {
   clearMediaListCache()
 })
@@ -58,11 +56,11 @@ describe('animeSynopsis', () => {
   })
 })
 
-function mockAniListResponse(media: unknown[]): Response {
+function mockAniListResponse(media: unknown[], hasNextPage = false): Response {
   return {
     ok: true,
     status: 200,
-    json: async () => ({ data: { Page: { media } } }),
+    json: async () => ({ data: { Page: { pageInfo: { hasNextPage }, media } } }),
   } as Response
 }
 
@@ -88,7 +86,7 @@ describe('fetchMediaList failure modes', () => {
       } as unknown as Response),
     )
 
-    await expect(fetchTrendingNow()).rejects.toThrow(
+    await expect(fetchDiscoverPool()).rejects.toThrow(
       'AniList rate limit reached (30 requests/minute) — retry in 47s.',
     )
   })
@@ -103,7 +101,7 @@ describe('fetchMediaList failure modes', () => {
       } as unknown as Response),
     )
 
-    await expect(fetchTrendingNow()).rejects.toThrow('AniList rejected the query: Invalid sort value')
+    await expect(fetchDiscoverPool()).rejects.toThrow('AniList rejected the query: Invalid sort value')
   })
 
   it('reports the HTTP status for other non-2xx responses', async () => {
@@ -118,7 +116,7 @@ describe('fetchMediaList failure modes', () => {
       } as unknown as Response),
     )
 
-    await expect(fetchTrendingNow()).rejects.toThrow('AniList request failed: HTTP 503')
+    await expect(fetchDiscoverPool()).rejects.toThrow('AniList request failed: HTTP 503')
   })
 
   it('rejects rather than throwing a TypeError on an unexpected shape', async () => {
@@ -131,105 +129,7 @@ describe('fetchMediaList failure modes', () => {
       } as unknown as Response),
     )
 
-    await expect(fetchTrendingNow()).rejects.toThrow('AniList returned an unexpected response shape.')
-  })
-})
-
-describe('adult content filtering', () => {
-  it('filters isAdult and the Ecchi genre by default', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await fetchTrendingNow()
-
-    const variables = lastRequestVariables(fetchMock)
-    expect(variables.isAdult).toBe(false)
-    expect(variables.genre_not_in).toEqual(['Ecchi'])
-  })
-
-  it('applies no adult-content filter when showAdultContent is true', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await fetchTrendingNow(true)
-
-    const variables = lastRequestVariables(fetchMock)
-    expect(variables.isAdult).toBeUndefined()
-    expect(variables.genre_not_in).toBeUndefined()
-  })
-})
-
-describe('fetchTrendingNow', () => {
-  it('sorts by TRENDING_DESC', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await fetchTrendingNow()
-
-    expect(lastRequestVariables(fetchMock).sort).toEqual(['TRENDING_DESC'])
-  })
-})
-
-describe('fetchNewReleases', () => {
-  it('filters to currently releasing anime sorted by newest start date', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await fetchNewReleases()
-
-    const variables = lastRequestVariables(fetchMock)
-    expect(variables.status).toBe('RELEASING')
-    expect(variables.sort).toEqual(['START_DATE_DESC'])
-  })
-})
-
-describe('fetchTrendingNow / fetchNewReleases caching', () => {
-  it('serves a second call from cache instead of refetching', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([{ id: 1 }]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const first = await fetchTrendingNow()
-    const second = await fetchTrendingNow()
-
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(second).toEqual(first)
-  })
-
-  it('does not share a cache entry across showAdultContent values or sections', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await fetchTrendingNow(false)
-    await fetchTrendingNow(true)
-    await fetchNewReleases(false)
-
-    expect(fetchMock).toHaveBeenCalledTimes(3)
-  })
-
-  it('refetches once the cache entry expires', async () => {
-    vi.useFakeTimers()
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await fetchTrendingNow()
-    vi.advanceTimersByTime(5 * 60 * 1000 + 1)
-    await fetchTrendingNow()
-
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    vi.useRealTimers()
-  })
-})
-
-describe('fetchRandomRecommendations', () => {
-  it('makes exactly one request and returns 12 results', async () => {
-    const pool = Array.from({ length: 40 }, (_, i) => ({ id: i }))
-    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse(pool))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const result = await fetchRandomRecommendations()
-
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(result).toHaveLength(12)
+    await expect(fetchDiscoverPool()).rejects.toThrow('AniList returned an unexpected response shape.')
   })
 })
 
@@ -288,5 +188,147 @@ describe('fetchDiscoverPool', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(result).toHaveLength(50)
+  })
+})
+
+describe('fetchBrowseAnime adult content filtering', () => {
+  it('filters isAdult and the Ecchi genre by default', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 1, genres: [], sort: 'Popularity', search: '', showAdultContent: false })
+
+    const variables = lastRequestVariables(fetchMock)
+    expect(variables.isAdult).toBe(false)
+    expect(variables.genre_not_in).toEqual(['Ecchi'])
+  })
+
+  it('applies no adult-content filter when showAdultContent is true', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 1, genres: [], sort: 'Popularity', search: '', showAdultContent: true })
+
+    const variables = lastRequestVariables(fetchMock)
+    expect(variables.isAdult).toBeUndefined()
+    expect(variables.genre_not_in).toBeUndefined()
+  })
+})
+
+describe('fetchBrowseAnime sorting', () => {
+  it('maps each non-Shuffle sort label to its AniList MediaSort value', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 1, genres: [], sort: 'Highest Rated', search: '', showAdultContent: false })
+
+    expect(lastRequestVariables(fetchMock).sort).toEqual(['SCORE_DESC'])
+  })
+
+  it('maps Shuffle to POPULARITY_DESC with a random page instead of the caller\'s page', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 1, genres: [], sort: 'Shuffle', search: '', showAdultContent: false })
+
+    const variables = lastRequestVariables(fetchMock)
+    expect(variables.sort).toEqual(['POPULARITY_DESC'])
+    expect(variables.page).toBeGreaterThanOrEqual(1)
+    expect(variables.page).toBeLessThanOrEqual(20)
+  })
+})
+
+describe('fetchBrowseAnime genres and search', () => {
+  it('forwards genres and trimmed search text', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({
+      page: 1,
+      genres: ['Action', 'Comedy'],
+      sort: 'Popularity',
+      search: '  Frieren  ',
+      showAdultContent: false,
+    })
+
+    const variables = lastRequestVariables(fetchMock)
+    expect(variables.genre_in).toEqual(['Action', 'Comedy'])
+    expect(variables.search).toBe('Frieren')
+  })
+
+  it('omits genre_in and search when neither is set', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 1, genres: [], sort: 'Popularity', search: '   ', showAdultContent: false })
+
+    const variables = lastRequestVariables(fetchMock)
+    expect(variables.genre_in).toBeUndefined()
+    expect(variables.search).toBeUndefined()
+  })
+})
+
+describe('fetchBrowseAnime pagination', () => {
+  it('returns hasNextPage and the page of results from the response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([{ id: 1 }], true))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await fetchBrowseAnime({ page: 1, genres: [], sort: 'Popularity', search: '', showAdultContent: false })
+
+    expect(result.hasNextPage).toBe(true)
+    expect(result.anime).toHaveLength(1)
+  })
+
+  it('requests the given page for non-Shuffle sorts', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 3, genres: [], sort: 'Newest', search: '', showAdultContent: false })
+
+    expect(lastRequestVariables(fetchMock).page).toBe(3)
+  })
+})
+
+describe('fetchBrowseAnime caching', () => {
+  it('serves a repeated non-Shuffle query from cache', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([{ id: 1 }]))
+    vi.stubGlobal('fetch', fetchMock)
+    const opts = { page: 1, genres: ['Action'], sort: 'Popularity' as const, search: '', showAdultContent: false }
+
+    await fetchBrowseAnime(opts)
+    await fetchBrowseAnime(opts)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a changed genre selection as a new cache entry', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 1, genres: ['Action'], sort: 'Popularity', search: '', showAdultContent: false })
+    await fetchBrowseAnime({ page: 1, genres: ['Comedy'], sort: 'Popularity', search: '', showAdultContent: false })
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('treats the same genres selected in a different order as the same cache entry', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchBrowseAnime({ page: 1, genres: ['Action', 'Comedy'], sort: 'Popularity', search: '', showAdultContent: false })
+    await fetchBrowseAnime({ page: 1, genres: ['Comedy', 'Action'], sort: 'Popularity', search: '', showAdultContent: false })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('never caches Shuffle results, even with identical options', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockAniListResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+    const opts = { page: 1, genres: [], sort: 'Shuffle' as const, search: '', showAdultContent: false }
+
+    await fetchBrowseAnime(opts)
+    await fetchBrowseAnime(opts)
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })

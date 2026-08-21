@@ -31,15 +31,18 @@ const MEDIA_LIST_QUERY = `
     $genre_not_in: [String]
     $isAdult: Boolean
     $sort: [MediaSort]
-    $status: MediaStatus
+    $search: String
   ) {
     Page(page: $page, perPage: $perPage) {
+      pageInfo {
+        hasNextPage
+      }
       media(
         genre_in: $genre_in
         genre_not_in: $genre_not_in
         isAdult: $isAdult
         sort: $sort
-        status: $status
+        search: $search
         type: ANIME
       ) {
         id
@@ -61,7 +64,7 @@ interface MediaListVariables {
   genre_not_in?: string[]
   isAdult?: boolean
   sort?: string[]
-  status?: string
+  search?: string
 }
 
 // AniList marks explicit/hentai titles isAdult: true, but "Ecchi" (fanservice,
@@ -73,7 +76,12 @@ function adultContentFilter(showAdultContent: boolean): Pick<MediaListVariables,
   return { isAdult: false, genre_not_in: ['Ecchi'] }
 }
 
-async function fetchMediaList(variables: MediaListVariables): Promise<AniListAnime[]> {
+interface MediaListResult {
+  media: AniListAnime[]
+  hasNextPage: boolean
+}
+
+async function fetchMediaList(variables: MediaListVariables): Promise<MediaListResult> {
   const response = await fetch(ANILIST_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -95,7 +103,7 @@ async function fetchMediaList(variables: MediaListVariables): Promise<AniListAni
   // GraphQL reports query-level failures as a 200 with an `errors` array and
   // a null `data`, so this has to be checked separately from response.ok.
   const json = (await response.json()) as {
-    data?: { Page?: { media?: AniListAnime[] } }
+    data?: { Page?: { media?: AniListAnime[]; pageInfo?: { hasNextPage?: boolean } } }
     errors?: { message: string }[]
   }
   if (json.errors?.length) {
@@ -106,7 +114,7 @@ async function fetchMediaList(variables: MediaListVariables): Promise<AniListAni
   if (!media) {
     throw new Error('AniList returned an unexpected response shape.')
   }
-  return media
+  return { media, hasNextPage: json.data?.Page?.pageInfo?.hasNextPage ?? false }
 }
 
 // ponytail: perPage: 40, page: random(1-20) covers a pool of ~800 popular
@@ -116,26 +124,29 @@ function randomPage(): number {
   return Math.floor(Math.random() * 20) + 1
 }
 
-// Shared by fetchRandomRecommendations/fetchRandomAnime/fetchDiscoverPool:
-// same random-page, popularity-sorted pool, just a different perPage.
-function fetchRandomPool(perPage: number, showAdultContent: boolean): Promise<AniListAnime[]> {
-  return fetchMediaList({
+// Shared by fetchRandomAnime/fetchDiscoverPool: same random-page,
+// popularity-sorted pool, just a different perPage.
+async function fetchRandomPool(perPage: number, showAdultContent: boolean): Promise<AniListAnime[]> {
+  const { media } = await fetchMediaList({
     page: randomPage(),
     perPage,
     sort: ['POPULARITY_DESC'],
     ...adultContentFilter(showAdultContent),
   })
+  return media
 }
 
 const CACHE_TTL_MS = 5 * 60 * 1000
 
 // In-memory only — resets on a hard page reload, which is fine, it exists to
-// absorb repeat SPA navigation (Recommendations -> Profile -> Recommendations),
-// not to survive a refresh. Keyed by showAdultContent too, so flipping that
-// preference naturally misses the cache instead of needing manual invalidation.
-const mediaListCache = new Map<string, { data: AniListAnime[]; expiresAt: number }>()
+// absorb repeat SPA navigation and filter thrash within Browse & Search
+// (toggling a genre chip back and forth, flipping sort, re-running a prior
+// search), not to survive a refresh. Keyed by the full variable set, so a
+// different filter combination naturally misses the cache instead of
+// needing manual invalidation.
+const mediaListCache = new Map<string, { data: MediaListResult; expiresAt: number }>()
 
-async function cachedFetchMediaList(key: string, variables: MediaListVariables): Promise<AniListAnime[]> {
+async function cachedFetchMediaList(key: string, variables: MediaListVariables): Promise<MediaListResult> {
   const cached = mediaListCache.get(key)
   if (cached && cached.expiresAt > Date.now()) {
     return cached.data
@@ -145,37 +156,9 @@ async function cachedFetchMediaList(key: string, variables: MediaListVariables):
   return data
 }
 
-// Test-only: clears the Trending Now / New Releases cache between test cases.
+// Test-only: clears the Browse & Search cache between test cases.
 export function clearMediaListCache(): void {
   mediaListCache.clear()
-}
-
-// Cached: this is the same data for every user at a given moment, unlike
-// fetchRandomRecommendations (meant to vary), so repeat navigation within
-// CACHE_TTL_MS costs zero AniList requests.
-export async function fetchTrendingNow(showAdultContent = false): Promise<AniListAnime[]> {
-  return cachedFetchMediaList(`trending:${showAdultContent}`, {
-    page: 1,
-    perPage: 12,
-    sort: ['TRENDING_DESC'],
-    ...adultContentFilter(showAdultContent),
-  })
-}
-
-export async function fetchNewReleases(showAdultContent = false): Promise<AniListAnime[]> {
-  return cachedFetchMediaList(`newReleases:${showAdultContent}`, {
-    page: 1,
-    perPage: 12,
-    status: 'RELEASING',
-    sort: ['START_DATE_DESC'],
-    ...adultContentFilter(showAdultContent),
-  })
-}
-
-export async function fetchRandomRecommendations(showAdultContent = false): Promise<AniListAnime[]> {
-  const pool = await fetchRandomPool(40, showAdultContent)
-  const shuffled = [...pool].sort(() => 0.5 - Math.random())
-  return shuffled.slice(0, 12)
 }
 
 export async function fetchRandomAnime(
@@ -194,4 +177,74 @@ export async function fetchRandomAnime(
 // Discover.tsx filters out already-swiped ids client-side.
 export async function fetchDiscoverPool(showAdultContent = false): Promise<AniListAnime[]> {
   return fetchRandomPool(50, showAdultContent)
+}
+
+export const BROWSE_SORTS = {
+  Popularity: 'POPULARITY_DESC',
+  'Highest Rated': 'SCORE_DESC',
+  Newest: 'START_DATE_DESC',
+  Shuffle: 'SHUFFLE',
+} as const
+
+export type BrowseSortLabel = keyof typeof BROWSE_SORTS
+
+export const BROWSE_GENRES = [
+  'Action',
+  'Adventure',
+  'Comedy',
+  'Drama',
+  'Ecchi',
+  'Fantasy',
+  'Horror',
+  'Mahou Shoujo',
+  'Mecha',
+  'Music',
+  'Mystery',
+  'Psychological',
+  'Romance',
+  'Sci-Fi',
+  'Slice of Life',
+  'Sports',
+  'Supernatural',
+  'Thriller',
+] as const
+
+const BROWSE_PER_PAGE = 24
+
+interface BrowseAnimeOptions {
+  page: number
+  genres: string[]
+  sort: BrowseSortLabel
+  search: string
+  showAdultContent: boolean
+}
+
+// Explore's Browse & Search: genre/sort/search against AniList directly.
+// Shuffle isn't a real MediaSort. It samples a fresh random page every
+// call, bypassing the cache (a repeat sample should vary, not repeat, so
+// caching it would defeat the point) instead of paginating sequentially
+// like the other three sorts.
+export async function fetchBrowseAnime(
+  opts: BrowseAnimeOptions,
+): Promise<{ anime: AniListAnime[]; hasNextPage: boolean }> {
+  const isShuffle = opts.sort === 'Shuffle'
+  const trimmedSearch = opts.search.trim()
+
+  const variables: MediaListVariables = {
+    page: isShuffle ? randomPage() : opts.page,
+    perPage: BROWSE_PER_PAGE,
+    sort: [isShuffle ? 'POPULARITY_DESC' : BROWSE_SORTS[opts.sort]],
+    // Sorted so click order (Action-then-Comedy vs. Comedy-then-Action) maps
+    // to the same cache key. genre_in is an unordered set filter to AniList,
+    // so this doesn't change what's requested, only the cache key's stability.
+    ...(opts.genres.length > 0 ? { genre_in: [...opts.genres].sort() } : {}),
+    ...(trimmedSearch ? { search: trimmedSearch } : {}),
+    ...adultContentFilter(opts.showAdultContent),
+  }
+
+  const { media, hasNextPage } = isShuffle
+    ? await fetchMediaList(variables)
+    : await cachedFetchMediaList(`browse:${JSON.stringify(variables)}`, variables)
+
+  return { anime: media, hasNextPage }
 }

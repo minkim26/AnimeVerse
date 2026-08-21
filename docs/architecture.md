@@ -23,12 +23,12 @@ There is no reverse proxy or API gateway — the frontend talks to the Express A
 3. The route handler validates the request body with a Zod schema (`lib/zod.ts`), then reads/writes via Prisma, scoped to `req.user.id`. There is no separate authorization layer — ownership is enforced by always filtering/writing on the authenticated user's own ID, never a client-supplied one.
 4. Errors thrown by Zod or Prisma are caught by `server.ts`'s centralized error handler and translated to an HTTP status (`ZodError` → 400, Prisma `P2003` invalid foreign key → 400, Prisma `P2025` record not found → falls through to the 404 handler).
 
-## Request flow: AniList-backed pages (Recommendations, random anime)
+## Request flow: AniList-backed pages (Browse & Search, random anime)
 
 The frontend calls `https://graphql.anilist.co` directly from the browser (`src/services/anilist.ts`) — the Express API is not involved at all for this data. This means:
 
 - No backend caching or rate-limiting sits in front of AniList; the app is subject to AniList's own public rate limits (30 requests/minute).
-- If AniList is unreachable or changes its response shape, the Express API's health has no bearing on whether Recommendations/random-anime work.
+- If AniList is unreachable or changes its response shape, the Express API's health has no bearing on whether Browse & Search/random-anime work.
 
 ## Request flow: avatar upload (async)
 

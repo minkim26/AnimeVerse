@@ -211,7 +211,7 @@ export const BROWSE_GENRES = [
 
 const BROWSE_PER_PAGE = 24
 
-export interface BrowseAnimeOptions {
+interface BrowseAnimeOptions {
   page: number
   genres: string[]
   sort: BrowseSortLabel

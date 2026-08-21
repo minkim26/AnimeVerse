@@ -104,7 +104,7 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
   // results, and debounce so rapid chip/sort/search changes don't fire a
   // request per click or keystroke against AniList's 30 req/min limit.
   //
-  // ponytail: no request-id guard against out-of-order responses — a very
+  // ponytail: no request-id guard against out-of-order responses. A very
   // rapid filter change could in theory show a stale result if two fetches
   // race. Add an AbortController per fetch if this becomes visible in
   // practice; the 400ms debounce already makes it unlikely.

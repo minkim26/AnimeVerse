@@ -220,7 +220,7 @@ export interface BrowseAnimeOptions {
 }
 
 // Explore's Browse & Search: genre/sort/search against AniList directly.
-// Shuffle isn't a real MediaSort — it samples a fresh random page every
+// Shuffle isn't a real MediaSort. It samples a fresh random page every
 // call, bypassing the cache (a repeat sample should vary, not repeat, so
 // caching it would defeat the point) instead of paginating sequentially
 // like the other three sorts.

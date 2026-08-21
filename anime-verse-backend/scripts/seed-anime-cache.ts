@@ -56,13 +56,13 @@ async function fetchPage(page: number): Promise<AniListMedia[]> {
 // Seeds the shared Anime cache directly (bypassing the swipe requirement)
 // so a fresh/low-traffic deployment has more than a handful of candidates
 // for GET /recommendations/for-you. upsertAnime is write-once (ON CONFLICT
-// DO NOTHING), so this is safe to rerun — already-cached rows are skipped,
+// DO NOTHING), so this is safe to rerun. Already-cached rows are skipped,
 // not refreshed.
 //
 // PAGES * 50 is the number of titles fetched. AniList's cap is 30 req/min;
 // raise PAGES freely, it would take well over 600 to be worth throttling.
 //
-// ponytail: no retry/backoff on a fetch failure — just rerun the script,
+// ponytail: no retry/backoff on a fetch failure, just rerun the script.
 // upsertAnime's idempotency makes that safe.
 const PAGES = 6
 

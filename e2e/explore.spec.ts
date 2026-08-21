@@ -29,7 +29,7 @@ test('signup then Explore page renders For You and Browse & Search', async ({ pa
   await expect(page.getByRole('heading', { name: 'For You' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Browse & Search' })).toBeVisible()
   await expect(page.locator('img').first()).toBeVisible({ timeout: 15000 })
-  // Gate on the section actually leaving its loading state — otherwise a slow
+  // Gate on the section actually leaving its loading state. Otherwise a slow
   // request could still be "loading" when the assertion below runs, passing
   // even if the section is broken. Same pattern as console-errors.spec.ts.
   await expect(page.getByText('Loading...')).toHaveCount(0, { timeout: 15000 })
@@ -47,7 +47,7 @@ test('signup then Explore page renders For You and Browse & Search', async ({ pa
   await expect(page.getByText('Loading...')).toHaveCount(0, { timeout: 15000 })
   await expect(browseSection.locator('p[class*="color-error"]')).toHaveCount(0)
 
-  // Load More appends results without a duplicate React key — a duplicate
+  // Load More appends results without a duplicate React key. A duplicate
   // would surface as a console error, asserted separately in
   // console-errors.spec.ts. Runs before the search below: Action + Newest
   // still has a deep results pool, so hasNextPage is true and the button is

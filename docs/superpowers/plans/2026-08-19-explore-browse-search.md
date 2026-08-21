@@ -613,7 +613,7 @@ export interface BrowseAnimeOptions {
 }
 
 // Explore's Browse & Search: genre/sort/search against AniList directly.
-// Shuffle isn't a real MediaSort — it samples a fresh random page every
+// Shuffle isn't a real MediaSort. It samples a fresh random page every
 // call, bypassing the cache (a repeat sample should vary, not repeat, so
 // caching it would defeat the point) instead of paginating sequentially
 // like the other three sorts.
@@ -782,7 +782,7 @@ function BrowseSearch({ showAdultContent }: BrowseSearchProps) {
   // results, and debounce so rapid chip/sort/search changes don't fire a
   // request per click or keystroke against AniList's 30 req/min limit.
   //
-  // ponytail: no request-id guard against out-of-order responses — a very
+  // ponytail: no request-id guard against out-of-order responses. A very
   // rapid filter change could in theory show a stale result if two fetches
   // race. Add an AbortController per fetch if this becomes visible in
   // practice; the 400ms debounce already makes it unlikely.
@@ -1136,7 +1136,7 @@ test('signup then Explore page renders For You and Browse & Search', async ({ pa
   await expect(page.getByRole('heading', { name: 'For You' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Browse & Search' })).toBeVisible()
   await expect(page.locator('img').first()).toBeVisible({ timeout: 15000 })
-  // Gate on the section actually leaving its loading state — otherwise a slow
+  // Gate on the section actually leaving its loading state. Otherwise a slow
   // request could still be "loading" when the assertion below runs, passing
   // even if the section is broken. Same pattern as console-errors.spec.ts.
   await expect(page.getByText('Loading...')).toHaveCount(0, { timeout: 15000 })
@@ -1154,7 +1154,7 @@ test('signup then Explore page renders For You and Browse & Search', async ({ pa
   await expect(page.getByText('Loading...')).toHaveCount(0, { timeout: 15000 })
   await expect(browseSection.locator('p[class*="color-error"]')).toHaveCount(0)
 
-  // Load More appends results without a duplicate React key — a duplicate
+  // Load More appends results without a duplicate React key. A duplicate
   // would surface as a console error, asserted separately in
   // console-errors.spec.ts.
   const loadMoreButton = browseSection.getByRole('button', { name: 'Load More' })
@@ -1211,7 +1211,7 @@ In `CLAUDE.md`'s "Known quirks worth checking before assuming behavior" section,
 
 ```markdown
 - `Recommendations.tsx` was renamed to `Explore.tsx` (route `/recommendations` → `/explore`) once its "Browse & Search" section shipped; there's no redirect from the old path since no production deployment exists to have indexed or bookmarked it.
-- Explore's "Browse & Search" section queries AniList directly, same as Discover's swipe pool and Profile's random-anime widget — there's still no backend endpoint for browsing. Its results are cached client-side (`src/services/anilist.ts`'s `mediaListCache`, 5-minute TTL, keyed on the full filter combination) and its filter changes are debounced 400ms, both specifically to stay under AniList's 30 req/min limit when a user toggles genre chips or flips sort repeatedly. The "Shuffle" sort is this app's own sentinel (not a real AniList `MediaSort`) and deliberately bypasses that cache, since a repeat call should sample a new random page, not repeat the last one.
+- Explore's "Browse & Search" section queries AniList directly, same as Discover's swipe pool and Profile's random-anime widget. There's still no backend endpoint for browsing. Its results are cached client-side (`src/services/anilist.ts`'s `mediaListCache`, 5-minute TTL, keyed on the full filter combination) and its filter changes are debounced 400ms, both specifically to stay under AniList's 30 req/min limit when a user toggles genre chips or flips sort repeatedly. The "Shuffle" sort is this app's own sentinel (not a real AniList `MediaSort`) and deliberately bypasses that cache, since a repeat call should sample a new random page, not repeat the last one.
 ```
 
 - [ ] **Step 7: Commit**

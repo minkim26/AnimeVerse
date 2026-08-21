@@ -15,67 +15,6 @@ type SectionState =
   | { status: 'ok'; anime: AniListAnime[] }
   | { status: 'error'; message: string }
 
-interface AnimeSectionProps {
-  title: string
-  state: SectionState
-  tint: string
-  expanded: boolean
-  onToggleExpanded: () => void
-}
-
-function AnimeSection({ title, state, tint, expanded, onToggleExpanded }: AnimeSectionProps) {
-  const anime = state.status === 'ok' ? state.anime : []
-  const visible = expanded ? anime : anime.slice(0, COLLAPSED_COUNT)
-  const canToggle = anime.length > COLLAPSED_COUNT
-
-  return (
-    <section className="tile-accent p-6 sm:p-8 my-10" style={{ background: tint }}>
-      <div
-        className="flex items-center justify-between gap-3 mb-6 pb-3 border-b"
-        style={{ borderColor: 'color-mix(in oklch, var(--color-ink) 15%, transparent)' }}
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="h-6 w-1.5 rounded-full shrink-0" style={{ background: 'var(--color-ink)' }} />
-          <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-ink)] truncate">
-            {title}
-          </h2>
-        </div>
-        {canToggle && (
-          <button
-            type="button"
-            onClick={onToggleExpanded}
-            aria-expanded={expanded}
-            className="btn btn-outline text-xs px-4 py-2 shrink-0"
-          >
-            {expanded ? (
-              <>
-                <ChevronUp size={14} /> Show less
-              </>
-            ) : (
-              <>
-                <ChevronDown size={14} /> Show all ({anime.length})
-              </>
-            )}
-          </button>
-        )}
-      </div>
-      {state.status === 'loading' ? (
-        <p className="text-sm text-[var(--color-muted)]">Loading...</p>
-      ) : state.status === 'error' ? (
-        <p className="text-xs text-[var(--color-error)]">{state.message}</p>
-      ) : anime.length === 0 ? (
-        <p className="text-sm text-[var(--color-muted)]">Nothing to show here yet.</p>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-start">
-          {visible.map((a) => (
-            <AnimeCard key={a.id} anime={a} />
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
 const SORT_LABELS = Object.keys(BROWSE_SORTS) as BrowseSortLabel[]
 
 interface BrowseSearchProps {
@@ -253,6 +192,10 @@ export default function Explore() {
   const [byGenreExpanded, setByGenreExpanded] = useState(false)
   const [showAdultContent, setShowAdultContent] = useState(false)
 
+  const forYouAnime = byGenre.status === 'ok' ? byGenre.anime : []
+  const forYouVisible = byGenreExpanded ? forYouAnime : forYouAnime.slice(0, COLLAPSED_COUNT)
+  const forYouCanToggle = forYouAnime.length > COLLAPSED_COUNT
+
   useEffect(() => {
     getForYouRecommendations()
       .then((anime) => setByGenre({ status: 'ok', anime }))
@@ -290,13 +233,50 @@ export default function Explore() {
           Click on any anime title or its image to toggle more information about it.
         </p>
 
-        <AnimeSection
-          title="For You"
-          state={byGenre}
-          tint="var(--color-peach)"
-          expanded={byGenreExpanded}
-          onToggleExpanded={() => setByGenreExpanded((prev) => !prev)}
-        />
+        <section className="tile-accent p-6 sm:p-8 my-10" style={{ background: 'var(--color-peach)' }}>
+          <div
+            className="flex items-center justify-between gap-3 mb-6 pb-3 border-b"
+            style={{ borderColor: 'color-mix(in oklch, var(--color-ink) 15%, transparent)' }}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="h-6 w-1.5 rounded-full shrink-0" style={{ background: 'var(--color-ink)' }} />
+              <h2 className="font-display text-2xl font-semibold tracking-tight text-[var(--color-ink)] truncate">
+                For You
+              </h2>
+            </div>
+            {forYouCanToggle && (
+              <button
+                type="button"
+                onClick={() => setByGenreExpanded((prev) => !prev)}
+                aria-expanded={byGenreExpanded}
+                className="btn btn-outline text-xs px-4 py-2 shrink-0"
+              >
+                {byGenreExpanded ? (
+                  <>
+                    <ChevronUp size={14} /> Show less
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={14} /> Show all ({forYouAnime.length})
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+          {byGenre.status === 'loading' ? (
+            <p className="text-sm text-[var(--color-muted)]">Loading...</p>
+          ) : byGenre.status === 'error' ? (
+            <p className="text-xs text-[var(--color-error)]">{byGenre.message}</p>
+          ) : forYouAnime.length === 0 ? (
+            <p className="text-sm text-[var(--color-muted)]">Nothing to show here yet.</p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-start">
+              {forYouVisible.map((a) => (
+                <AnimeCard key={a.id} anime={a} />
+              ))}
+            </div>
+          )}
+        </section>
 
         <BrowseSearch showAdultContent={showAdultContent} />
       </main>

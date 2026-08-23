@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 
 import prisma from './prisma.ts'
-import { upsertAnime } from './animeCache.ts'
+import { upsertAnime, verifyAnime } from './animeCache.ts'
 import { tagsToVector, VECTOR_DIMENSION } from './tagVector.ts'
 
 function randomAnimeId(): number {
@@ -87,5 +87,63 @@ describe('upsertAnime', () => {
             SELECT "lastVerifiedAt" FROM "Anime" WHERE id = ${id}
         `
         expect(rows[0]?.lastVerifiedAt).toBeNull()
+    })
+})
+
+describe('verifyAnime', () => {
+    let createdId: number | null = null
+
+    afterEach(async () => {
+        if (createdId !== null) {
+            await prisma.anime.delete({ where: { id: createdId } }).catch(() => {})
+            createdId = null
+        }
+    })
+
+    it('overwrites an existing row\'s metadata, unlike upsertAnime', async () => {
+        const id = randomAnimeId()
+        createdId = id
+
+        await upsertAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: [{ name: 'Isekai', rank: 92 }], isAdult: false })
+        await verifyAnime({ id, title: 'Corrected', posterUrl: 'corrected.jpg', synopsis: 'Corrected synopsis.', tags: [{ name: 'Tragedy', rank: 60 }], isAdult: true })
+
+        const row = await readAnime(id)
+        expect(row?.title).toBe('Corrected')
+        expect(row?.isAdult).toBe(true)
+    })
+
+    it('recomputes tasteVector from the corrected tags', async () => {
+        const id = randomAnimeId()
+        createdId = id
+        const correctedTags = [{ name: 'Tragedy', rank: 60 }]
+
+        await upsertAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: [{ name: 'Isekai', rank: 92 }], isAdult: false })
+        await verifyAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: correctedTags, isAdult: false })
+
+        const row = await readAnime(id)
+        expect(row?.vector).toBe(`[${tagsToVector(correctedTags).join(',')}]`)
+    })
+
+    it('sets lastVerifiedAt to the current time', async () => {
+        const id = randomAnimeId()
+        createdId = id
+
+        await upsertAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: [], isAdult: false })
+        await verifyAnime({ id, title: 'First', posterUrl: null, synopsis: '', tags: [], isAdult: false })
+
+        const rows = await prisma.$queryRaw<{ lastVerifiedAt: Date | null }[]>`
+            SELECT "lastVerifiedAt" FROM "Anime" WHERE id = ${id}
+        `
+        expect(rows[0]?.lastVerifiedAt).not.toBeNull()
+    })
+
+    it('is a no-op against a row that does not exist (nothing to overwrite)', async () => {
+        const id = randomAnimeId()
+        await expect(
+            verifyAnime({ id, title: 'Nope', posterUrl: null, synopsis: '', tags: [], isAdult: false })
+        ).resolves.not.toThrow()
+
+        const row = await readAnime(id)
+        expect(row).toBeNull()
     })
 })

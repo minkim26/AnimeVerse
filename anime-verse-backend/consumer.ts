@@ -6,10 +6,13 @@ import http from 'http'
 import prisma from './lib/prisma.ts'
 import supabase from './lib/supabase.ts'
 import { setJSON, userCacheKey, withoutPassword, USER_CACHE_TTL_SECONDS } from './lib/cache.ts'
-import { AVATAR_QUEUE, setupAvatarQueue } from './lib/queue.ts'
+import { AVATAR_QUEUE, setupAvatarQueue, ANIME_REFRESH_QUEUE, setupAnimeRefreshQueue } from './lib/queue.ts'
+import { fetchAnimeById } from './lib/anilistServer.ts'
+import { verifyAnime } from './lib/animeCache.ts'
 
 const THUMBNAIL_SIZE = 128
 const HEALTH_PORT = 8001
+const REFRESH_THROTTLE_MS = 2500
 
 export interface ThumbnailMessage {
     userId: number
@@ -58,6 +61,22 @@ export async function processThumbnailMessage({ userId, filename }: ThumbnailMes
     console.log(`Thumbnail generated for user ${userId}`)
 }
 
+export interface RefreshMessage {
+    animeId: number
+}
+
+/*
+ * processRefreshMessage — fetches an anime fresh from AniList and
+ * overwrites its cached row. Throws on failure (a missing AniList Media,
+ * a network error) so the caller nacks it to the anime-cache-refresh.dlq
+ * instead of silently skipping it.
+ */
+export async function processRefreshMessage({ animeId }: RefreshMessage): Promise<void> {
+    const verified = await fetchAnimeById(animeId)
+    await verifyAnime({ id: animeId, ...verified })
+    console.log(`Verified cached metadata for anime ${animeId}`)
+}
+
 /*
  * isReady reflects whether the RabbitMQ channel is actually open, not just
  * whether this process is alive — that's what makes the /health endpoint
@@ -89,6 +108,7 @@ async function main() {
 
     const channel = await conn.createChannel()
     await setupAvatarQueue(channel)
+    await setupAnimeRefreshQueue(channel)
     channel.prefetch(1)
     isReady = true
 
@@ -113,6 +133,34 @@ async function main() {
             console.error(`Failed to process avatar for user ${payload.userId}:`, err)
             channel.nack(msg, false, false)
         }
+    })
+
+    channel.consume(ANIME_REFRESH_QUEUE, async (msg) => {
+        if (!msg) return
+
+        let payload: RefreshMessage
+        try {
+            payload = JSON.parse(msg.content.toString())
+        } catch {
+            console.error('Invalid message format, discarding')
+            channel.nack(msg, false, false)
+            return
+        }
+
+        try {
+            await processRefreshMessage(payload)
+            channel.ack(msg)
+        } catch (err) {
+            console.error(`Failed to verify anime ${payload.animeId}:`, err)
+            channel.nack(msg, false, false)
+        }
+
+        // Throttles this queue to well under AniList's 30 req/min limit.
+        // channel.prefetch(1) above means only one anime-cache-refresh
+        // message is in flight at a time, so this sleep directly paces
+        // AniList calls — roughly 24/min, and on a separate IP from users'
+        // client-side AniList traffic, so it never competes with it.
+        await new Promise((resolve) => setTimeout(resolve, REFRESH_THROTTLE_MS))
     })
 }
 

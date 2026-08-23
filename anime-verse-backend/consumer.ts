@@ -91,7 +91,12 @@ export async function processRefreshMessage({ animeId }: RefreshMessage): Promis
 export async function handleRefreshMessage(channel: amqplib.Channel, msg: amqplib.ConsumeMessage): Promise<void> {
     let payload: RefreshMessage
     try {
-        payload = JSON.parse(msg.content.toString())
+        const parsed: unknown = JSON.parse(msg.content.toString())
+        const animeId = (parsed as { animeId?: unknown } | null)?.animeId
+        if (typeof animeId !== 'number' || !Number.isInteger(animeId) || animeId <= 0) {
+            throw new Error('Invalid animeId')
+        }
+        payload = { animeId }
     } catch {
         console.error('Invalid message format, discarding')
         channel.nack(msg, false, false)

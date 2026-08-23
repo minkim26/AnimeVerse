@@ -115,4 +115,16 @@ describe('handleRefreshMessage', () => {
         expect(channel.nack).toHaveBeenCalledWith(badMsg, false, false)
         expect(fetchAnimeById).not.toHaveBeenCalled()
     })
+
+    it('nacks a syntactically valid but wrong-shaped payload instead of throwing', async () => {
+        const channel = fakeChannel()
+        // JSON.parse('null') succeeds, so this isn't caught by the
+        // parse-failure branch above — it needs its own shape check.
+        const nullMsg = { content: Buffer.from('null') } as amqplib.ConsumeMessage
+
+        await expect(handleRefreshMessage(channel, nullMsg)).resolves.toBeUndefined()
+
+        expect(channel.nack).toHaveBeenCalledWith(nullMsg, false, false)
+        expect(fetchAnimeById).not.toHaveBeenCalled()
+    })
 })

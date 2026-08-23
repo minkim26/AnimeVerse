@@ -116,7 +116,7 @@ Recomputing `tasteVector` via the same `tagsToVector()` used by `upsertAnime` ma
 ### `api/admin.ts` (new) — `POST /admin/anime-cache/refresh`
 
 1. Compare the `X-Cron-Secret` header against `process.env.ADMIN_CRON_SECRET` with a constant-time check. Missing or mismatched → 401, nothing else runs.
-2. `SELECT id FROM "Anime" ORDER BY "lastVerifiedAt" ASC NULLS FIRST LIMIT 25` (`REFRESH_BATCH_SIZE = 25`, a top-of-file constant — same style as `consumer.ts`'s existing `THUMBNAIL_SIZE`).
+2. `SELECT id FROM "Anime" ORDER BY "lastVerifiedAt" ASC NULLS FIRST, random() LIMIT 25` (`REFRESH_BATCH_SIZE = 25`, a top-of-file constant). The randomized tiebreak rotates permanently unverifiable `NULL` rows instead of letting a deterministic subset monopolize every batch.
 3. Publish one message (`{ animeId }`) per row to `ANIME_REFRESH_QUEUE`.
 4. Respond `{ enqueued: number, animeIds: number[] }` — enough for the workflow's log to show what happened without needing a separate dashboard.
 

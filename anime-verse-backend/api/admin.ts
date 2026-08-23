@@ -17,19 +17,14 @@ async function getChannel(): Promise<amqplib.Channel> {
         // an unhandled 'error' event on the connection/channel EventEmitter
         // crashes the whole API process, and a stale channel after a
         // RabbitMQ restart would otherwise get reused forever.
-        conn.on('error', () => {
+        const invalidate = () => {
             channel = null
-        })
-        conn.on('close', () => {
-            channel = null
-        })
+        }
+        conn.on('error', invalidate)
+        conn.on('close', invalidate)
         const ch = await conn.createChannel()
-        ch.on('error', () => {
-            channel = null
-        })
-        ch.on('close', () => {
-            channel = null
-        })
+        ch.on('error', invalidate)
+        ch.on('close', invalidate)
         await setupAnimeRefreshQueue(ch)
         channel = ch
     }

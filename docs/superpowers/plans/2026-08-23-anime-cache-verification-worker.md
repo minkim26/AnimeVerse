@@ -733,7 +733,7 @@ async function getChannel(): Promise<amqplib.Channel> {
  */
 router.post('/anime-cache/refresh', requireCronSecret, async (req, res) => {
     const rows = await prisma.$queryRaw<{ id: number }[]>`
-        SELECT id FROM "Anime" ORDER BY "lastVerifiedAt" ASC NULLS FIRST LIMIT ${REFRESH_BATCH_SIZE}
+        SELECT id FROM "Anime" ORDER BY "lastVerifiedAt" ASC NULLS FIRST, random() LIMIT ${REFRESH_BATCH_SIZE}
     `
 
     const ch = await getChannel()

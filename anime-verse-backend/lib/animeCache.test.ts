@@ -76,4 +76,16 @@ describe('upsertAnime', () => {
         const row = await readAnime(id)
         expect(row?.title).toBe('First')
     })
+
+    it('leaves lastVerifiedAt null on a freshly cached row', async () => {
+        const id = randomAnimeId()
+        createdId = id
+
+        await upsertAnime({ id, title: 'Test Anime', posterUrl: null, synopsis: '', tags: [], isAdult: false })
+
+        const rows = await prisma.$queryRaw<{ lastVerifiedAt: Date | null }[]>`
+            SELECT "lastVerifiedAt" FROM "Anime" WHERE id = ${id}
+        `
+        expect(rows[0]?.lastVerifiedAt).toBeNull()
+    })
 })

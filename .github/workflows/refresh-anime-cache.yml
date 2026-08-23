@@ -1,0 +1,18 @@
+name: Refresh Anime Cache
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger anime-cache verification
+        env:
+          API_URL: ${{ secrets.API_URL }}
+          ADMIN_CRON_SECRET: ${{ secrets.ADMIN_CRON_SECRET }}
+        run: |
+          curl -sf -X POST "$API_URL/admin/anime-cache/refresh" \
+            -H "X-Cron-Secret: $ADMIN_CRON_SECRET"

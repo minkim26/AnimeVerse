@@ -71,6 +71,7 @@ jobs:
       SUPABASE_URL: https://fake.supabase.co
       SUPABASE_KEY: fake-key
       PORT: 8000
+      ADMIN_CRON_SECRET: ci-test-admin-cron-secret-not-for-production-use
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -131,6 +132,7 @@ jobs:
       SUPABASE_URL: https://fake.supabase.co
       SUPABASE_KEY: fake-key
       PORT: 8000
+      ADMIN_CRON_SECRET: ci-test-admin-cron-secret-not-for-production-use
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

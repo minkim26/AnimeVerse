@@ -3,7 +3,11 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
-  retries: 0,
+  // Local runs fail fast on a real bug. CI retries twice because these tests
+  // hit AniList's live API with no mocking (deliberate — see CLAUDE.md) and
+  // an occasional slow or failed AniList response can fail a run even when
+  // the app is correct.
+  retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? 'html' : 'list',
   webServer: {
     // Dedicated port + explicit API URL so the E2E always exercises THIS

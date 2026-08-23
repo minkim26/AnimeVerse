@@ -83,14 +83,15 @@ model Title {
 // only to satisfy Prisma's migration requirement for Unsupported columns;
 // it's always set via raw SQL on insert.
 model Anime {
-    id          Int      @id
-    title       String
-    posterUrl   String?
-    synopsis    String
-    tags        Json
-    tasteVector Unsupported("vector(335)")?
-    isAdult     Boolean  @default(false)
-    updatedAt   DateTime @updatedAt
+    id             Int       @id
+    title          String
+    posterUrl      String?
+    synopsis       String
+    tags           Json
+    tasteVector    Unsupported("vector(335)")?
+    isAdult        Boolean   @default(false)
+    lastVerifiedAt DateTime?
+    updatedAt      DateTime  @updatedAt
 
     swipes Swipe[]
 }

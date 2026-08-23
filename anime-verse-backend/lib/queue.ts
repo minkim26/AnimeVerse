@@ -5,21 +5,33 @@ export const AVATAR_DLX = 'avatar-thumbnails.dlx'
 export const AVATAR_DLQ = 'avatar-thumbnails.dlq'
 
 /*
- * setupAvatarQueue — declares the avatar-thumbnails queue with a
- * dead-letter exchange, so a message nack'd with requeue:false lands in
- * avatar-thumbnails.dlq for inspection instead of vanishing.
- *
- * Both api/avatar.ts (producer) and consumer.ts (consumer) call this on
- * their own channel. Keeping the declaration in one place matters because
- * RabbitMQ rejects assertQueue on an existing queue if the arguments don't
- * match exactly.
+ * setupDeadLetterQueue — declares a queue with a dead-letter exchange, so a
+ * message nack'd with requeue:false lands in <dlq> for inspection instead
+ * of vanishing. Keeping each declaration behind one function matters
+ * because RabbitMQ rejects assertQueue on an existing queue if the
+ * arguments don't match exactly.
  */
-export async function setupAvatarQueue(channel: amqplib.Channel): Promise<void> {
-    await channel.assertExchange(AVATAR_DLX, 'fanout', { durable: true })
-    await channel.assertQueue(AVATAR_DLQ, { durable: true })
-    await channel.bindQueue(AVATAR_DLQ, AVATAR_DLX, '')
-    await channel.assertQueue(AVATAR_QUEUE, {
+async function setupDeadLetterQueue(channel: amqplib.Channel, queue: string, dlx: string, dlq: string): Promise<void> {
+    await channel.assertExchange(dlx, 'fanout', { durable: true })
+    await channel.assertQueue(dlq, { durable: true })
+    await channel.bindQueue(dlq, dlx, '')
+    await channel.assertQueue(queue, {
         durable: true,
-        arguments: { 'x-dead-letter-exchange': AVATAR_DLX }
+        arguments: { 'x-dead-letter-exchange': dlx }
     })
 }
+
+// Both api/avatar.ts (producer) and consumer.ts (consumer) call this on
+// their own channel.
+export const setupAvatarQueue = (channel: amqplib.Channel): Promise<void> =>
+    setupDeadLetterQueue(channel, AVATAR_QUEUE, AVATAR_DLX, AVATAR_DLQ)
+
+export const ANIME_REFRESH_QUEUE = 'anime-cache-refresh'
+export const ANIME_REFRESH_DLX = 'anime-cache-refresh.dlx'
+export const ANIME_REFRESH_DLQ = 'anime-cache-refresh.dlq'
+
+// A separate queue from avatar-thumbnails: different message shape and
+// consumer logic, so a failure here shouldn't dead-letter alongside
+// avatar jobs.
+export const setupAnimeRefreshQueue = (channel: amqplib.Channel): Promise<void> =>
+    setupDeadLetterQueue(channel, ANIME_REFRESH_QUEUE, ANIME_REFRESH_DLX, ANIME_REFRESH_DLQ)

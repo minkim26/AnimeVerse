@@ -78,6 +78,46 @@ export async function processRefreshMessage({ animeId }: RefreshMessage): Promis
 }
 
 /*
+ * handleRefreshMessage — the anime-cache-refresh queue's full message
+ * handler: parse, process, throttle, then ack/nack. Exported so a test can
+ * assert the throttle actually gates message acknowledgement, not just
+ * that processRefreshMessage itself works.
+ *
+ * The delay runs BEFORE ack/nack, not after: channel.prefetch(1) frees the
+ * next message for delivery as soon as this one is acked, so sleeping
+ * after ack would let the next AniList call fire immediately and defeat
+ * the throttle entirely.
+ */
+export async function handleRefreshMessage(channel: amqplib.Channel, msg: amqplib.ConsumeMessage): Promise<void> {
+    let payload: RefreshMessage
+    try {
+        payload = JSON.parse(msg.content.toString())
+    } catch {
+        console.error('Invalid message format, discarding')
+        channel.nack(msg, false, false)
+        return
+    }
+
+    let succeeded = true
+    try {
+        await processRefreshMessage(payload)
+    } catch (err) {
+        console.error(`Failed to verify anime ${payload.animeId}:`, err)
+        succeeded = false
+    }
+
+    // Throttles this queue to well under AniList's 30 req/min limit — see
+    // the ordering note above for why this runs before ack/nack.
+    await new Promise((resolve) => setTimeout(resolve, REFRESH_THROTTLE_MS))
+
+    if (succeeded) {
+        channel.ack(msg)
+    } else {
+        channel.nack(msg, false, false)
+    }
+}
+
+/*
  * isReady reflects whether the RabbitMQ channel is actually open, not just
  * whether this process is alive — that's what makes the /health endpoint
  * below a meaningful Compose healthcheck target instead of a liveness-only
@@ -135,32 +175,9 @@ async function main() {
         }
     })
 
-    channel.consume(ANIME_REFRESH_QUEUE, async (msg) => {
+    channel.consume(ANIME_REFRESH_QUEUE, (msg) => {
         if (!msg) return
-
-        let payload: RefreshMessage
-        try {
-            payload = JSON.parse(msg.content.toString())
-        } catch {
-            console.error('Invalid message format, discarding')
-            channel.nack(msg, false, false)
-            return
-        }
-
-        try {
-            await processRefreshMessage(payload)
-            channel.ack(msg)
-        } catch (err) {
-            console.error(`Failed to verify anime ${payload.animeId}:`, err)
-            channel.nack(msg, false, false)
-        }
-
-        // Throttles this queue to well under AniList's 30 req/min limit.
-        // channel.prefetch(1) above means only one anime-cache-refresh
-        // message is in flight at a time, so this sleep directly paces
-        // AniList calls — roughly 24/min, and on a separate IP from users'
-        // client-side AniList traffic, so it never competes with it.
-        await new Promise((resolve) => setTimeout(resolve, REFRESH_THROTTLE_MS))
+        handleRefreshMessage(channel, msg)
     })
 }
 

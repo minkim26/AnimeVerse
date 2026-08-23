@@ -800,7 +800,7 @@ git commit -m "Add POST /admin/anime-cache/refresh, gated by a shared cron secre
 
 **Interfaces:**
 - Consumes: `fetchAnimeById` (Task 3), `verifyAnime` (Task 4), `ANIME_REFRESH_QUEUE` / `setupAnimeRefreshQueue` (Task 2).
-- Produces: `processRefreshMessage(msg: RefreshMessage): Promise<void>`, exported from `consumer.ts` (mirrors `processThumbnailMessage`'s existing export shape so tests can call it directly without a real AMQP connection).
+- Produces: `processRefreshMessage(msg: RefreshMessage): Promise<void>`, exported from `consumer.ts` (mirrors `processThumbnailMessage`'s existing export shape so tests can call it directly without a real AMQP connection). Also `handleRefreshMessage(channel: amqplib.Channel, msg: amqplib.ConsumeMessage): Promise<void>` — the full parse/process/throttle/ack-or-nack handler, exported so a test can assert the throttle actually gates acknowledgement.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -904,6 +904,47 @@ export async function processRefreshMessage({ animeId }: RefreshMessage): Promis
     await verifyAnime({ id: animeId, ...verified })
     console.log(`Verified cached metadata for anime ${animeId}`)
 }
+
+/*
+ * handleRefreshMessage — the anime-cache-refresh queue's full message
+ * handler: parse, process, throttle, then ack/nack. Exported separately
+ * from processRefreshMessage so a test can assert the throttle actually
+ * gates message acknowledgement.
+ *
+ * The delay runs BEFORE ack/nack, not after: channel.prefetch(1) frees the
+ * next message for delivery as soon as this one is acked, so sleeping
+ * after ack would let the next AniList call fire immediately and defeat
+ * the throttle entirely — an earlier draft of this got that ordering
+ * backwards.
+ */
+export async function handleRefreshMessage(channel: amqplib.Channel, msg: amqplib.ConsumeMessage): Promise<void> {
+    let payload: RefreshMessage
+    try {
+        payload = JSON.parse(msg.content.toString())
+    } catch {
+        console.error('Invalid message format, discarding')
+        channel.nack(msg, false, false)
+        return
+    }
+
+    let succeeded = true
+    try {
+        await processRefreshMessage(payload)
+    } catch (err) {
+        console.error(`Failed to verify anime ${payload.animeId}:`, err)
+        succeeded = false
+    }
+
+    // Throttles this queue to well under AniList's 30 req/min limit — see
+    // the ordering note above for why this runs before ack/nack.
+    await new Promise((resolve) => setTimeout(resolve, REFRESH_THROTTLE_MS))
+
+    if (succeeded) {
+        channel.ack(msg)
+    } else {
+        channel.nack(msg, false, false)
+    }
+}
 ```
 
 In `main()`, after `await setupAvatarQueue(channel)`, add:
@@ -914,39 +955,16 @@ In `main()`, after `await setupAvatarQueue(channel)`, add:
 After the existing `channel.consume(AVATAR_QUEUE, ...)` block, add:
 
 ```ts
-    channel.consume(ANIME_REFRESH_QUEUE, async (msg) => {
+    channel.consume(ANIME_REFRESH_QUEUE, (msg) => {
         if (!msg) return
-
-        let payload: RefreshMessage
-        try {
-            payload = JSON.parse(msg.content.toString())
-        } catch {
-            console.error('Invalid message format, discarding')
-            channel.nack(msg, false, false)
-            return
-        }
-
-        try {
-            await processRefreshMessage(payload)
-            channel.ack(msg)
-        } catch (err) {
-            console.error(`Failed to verify anime ${payload.animeId}:`, err)
-            channel.nack(msg, false, false)
-        }
-
-        // Throttles this queue to well under AniList's 30 req/min limit.
-        // channel.prefetch(1) above means only one anime-cache-refresh
-        // message is in flight at a time, so this sleep directly paces
-        // AniList calls — roughly 24/min, and on a separate IP from users'
-        // client-side AniList traffic, so it never competes with it.
-        await new Promise((resolve) => setTimeout(resolve, REFRESH_THROTTLE_MS))
+        handleRefreshMessage(channel, msg)
     })
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npm test -- animeRefresh`
-Expected: PASS (both cases)
+Expected: PASS (including `handleRefreshMessage`'s throttle-ordering cases, added after code review caught ack/nack firing before the delay in an earlier draft)
 
 Then run the full suite:
 Run: `ADMIN_CRON_SECRET=test-admin-cron-secret npm test`

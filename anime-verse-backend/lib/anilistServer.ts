@@ -53,7 +53,8 @@ export async function fetchAnimeById(id: number): Promise<Omit<AnimeCacheInput, 
     const response = await fetch(ANILIST_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: MEDIA_BY_ID_QUERY, variables: { id } })
+        body: JSON.stringify({ query: MEDIA_BY_ID_QUERY, variables: { id } }),
+        signal: AbortSignal.timeout(30_000)
     })
 
     if (!response.ok) {

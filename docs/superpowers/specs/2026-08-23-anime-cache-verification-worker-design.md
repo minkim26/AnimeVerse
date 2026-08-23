@@ -158,9 +158,9 @@ This workflow depends on the backend already being deployed at a stable URL (`AP
 
 A new GitHub repo secret and a new `anime-verse-backend/.env.production` entry, documented in `.env.example` the same way `JWT_SECRET` already is. Scoped to this one endpoint — if a second cron-triggered admin endpoint gets added later, whether to share this secret or mint a new one is a decision for that point, not this one.
 
-## Known limitation: a permanently-failing id
+## Known limitation: permanently-failing ids
 
-If AniList ever 404s for a cached id (e.g. the anime was removed from AniList), `lastVerifiedAt` never gets set for it, so `ORDER BY "lastVerifiedAt" ASC NULLS FIRST` keeps reselecting it first on every run — it dead-letters into `anime-cache-refresh.dlq` repeatedly instead of the job making forward progress on the rest of the backlog. Accepted for now: the DLQ makes the failure visible for manual inspection, and at this app's cache size that's a rare, low-cost edge case. If it becomes a real problem, the fix is small (e.g. set `lastVerifiedAt` on failure too, with a separate signal for "known bad") — not worth building preemptively.
+If AniList ever 404s for a cached id (e.g. the anime was removed from AniList), `lastVerifiedAt` never gets set for it, so it stays eligible for every future batch and can dead-letter into `anime-cache-refresh.dlq` repeatedly. The `random()` tiebreak on `ORDER BY "lastVerifiedAt" ASC NULLS FIRST` (see `api/admin.ts`) keeps one such id from monopolizing every batch, but it can still get re-picked and re-fail on any given run. Accepted for now: the DLQ makes the failure visible for manual inspection, and at this app's cache size that's a rare, low-cost edge case. If it becomes a real problem, the fix is small (e.g. set `lastVerifiedAt` on failure too, with a separate signal for "known bad") — not worth building preemptively.
 
 ## Testing Approach
 

@@ -13,8 +13,25 @@ let channel: amqplib.Channel | null = null
 async function getChannel(): Promise<amqplib.Channel> {
     if (!channel) {
         const conn = await amqplib.connect(process.env.RABBITMQ_URL || 'amqp://localhost')
-        channel = await conn.createChannel()
-        await setupAnimeRefreshQueue(channel)
+        // Mirrors consumer.ts's connection handling: without these listeners,
+        // an unhandled 'error' event on the connection/channel EventEmitter
+        // crashes the whole API process, and a stale channel after a
+        // RabbitMQ restart would otherwise get reused forever.
+        conn.on('error', () => {
+            channel = null
+        })
+        conn.on('close', () => {
+            channel = null
+        })
+        const ch = await conn.createChannel()
+        ch.on('error', () => {
+            channel = null
+        })
+        ch.on('close', () => {
+            channel = null
+        })
+        await setupAnimeRefreshQueue(ch)
+        channel = ch
     }
     return channel
 }

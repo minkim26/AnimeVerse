@@ -29,13 +29,20 @@ async function getChannel(): Promise<amqplib.Channel> {
  * returns immediately regardless of batch size.
  */
 router.post('/anime-cache/refresh', requireCronSecret, async (req, res) => {
-    // id DESC as a tiebreak makes the batch deterministic across ties on
-    // lastVerifiedAt (e.g. the large pool of never-verified rows) — plain
-    // NULLS FIRST alone leaves Postgres free to return a different subset
-    // on every call among equal values, which isn't wrong but is
-    // needlessly nondeterministic.
+    // random() as the tiebreak on lastVerifiedAt ties rotates which rows
+    // win across calls. A fixed tiebreak (id, insertion order, anything
+    // deterministic) would let a permanently-unverifiable id monopolize
+    // every single batch forever: POST /swipes accepts any animeId a
+    // client sends with no AniList existence check (see api/swipes.ts and
+    // lib/zod.ts's Swipe schema), so a bogus id caches with
+    // lastVerifiedAt = NULL, fails verification every time (fetchAnimeById
+    // throws, consumer.ts nacks to the DLQ without ever calling
+    // verifyAnime), and — under a fixed tiebreak — would keep winning the
+    // same NULL-vs-NULL comparison against every other never-verified row
+    // for as long as it exists. random() means it only occupies a slot
+    // sometimes, not always.
     const rows = await prisma.$queryRaw<{ id: number }[]>`
-        SELECT id FROM "Anime" ORDER BY "lastVerifiedAt" ASC NULLS FIRST, id DESC LIMIT ${REFRESH_BATCH_SIZE}
+        SELECT id FROM "Anime" ORDER BY "lastVerifiedAt" ASC NULLS FIRST, random() LIMIT ${REFRESH_BATCH_SIZE}
     `
 
     const ch = await getChannel()

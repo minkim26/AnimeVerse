@@ -74,7 +74,7 @@ See [docs/architecture.md](docs/architecture.md) for a deeper breakdown of each 
 
 ```bash
 cd anime-verse-backend
-cp .env.example .env.production   # fill in JWT_SECRET, SUPABASE_URL, SUPABASE_KEY
+cp .env.example .env.production   # fill in JWT_SECRET, ADMIN_CRON_SECRET, SUPABASE_URL, SUPABASE_KEY
 docker compose up
 ```
 
@@ -113,6 +113,7 @@ npm run dev                       # http://localhost:5173
 | `POSTGRES_URL` | Prisma connection string. `postgres` as host inside Docker Compose, `localhost` outside it. |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Used by the official `postgres` image to initialize the database (Docker Compose only). |
 | `JWT_SECRET` | Signs/verifies auth JWTs. Use a long random value outside local dev. |
+| `ADMIN_CRON_SECRET` | Shared secret the `refresh-anime-cache.yml` cron workflow sends as `X-Cron-Secret` to `POST /admin/anime-cache/refresh`. Must be at least 32 characters; the server refuses to start otherwise. |
 | `PORT` | API listen port (defaults to `8000`). |
 | `SUPABASE_URL` | The AnimeVerse Supabase project's API URL. |
 | `SUPABASE_KEY` | Supabase **service_role** key. Server-side only, never shipped to the frontend. |

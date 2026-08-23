@@ -23,3 +23,24 @@ export async function setupAvatarQueue(channel: amqplib.Channel): Promise<void> 
         arguments: { 'x-dead-letter-exchange': AVATAR_DLX }
     })
 }
+
+export const ANIME_REFRESH_QUEUE = 'anime-cache-refresh'
+export const ANIME_REFRESH_DLX = 'anime-cache-refresh.dlx'
+export const ANIME_REFRESH_DLQ = 'anime-cache-refresh.dlq'
+
+/*
+ * setupAnimeRefreshQueue — same dead-letter pattern as setupAvatarQueue,
+ * for the anime-cache verification worker's queue. A separate queue (not
+ * shared with avatar-thumbnails) because the message shape and consumer
+ * logic are unrelated — a failure here shouldn't dead-letter alongside
+ * avatar jobs.
+ */
+export async function setupAnimeRefreshQueue(channel: amqplib.Channel): Promise<void> {
+    await channel.assertExchange(ANIME_REFRESH_DLX, 'fanout', { durable: true })
+    await channel.assertQueue(ANIME_REFRESH_DLQ, { durable: true })
+    await channel.bindQueue(ANIME_REFRESH_DLQ, ANIME_REFRESH_DLX, '')
+    await channel.assertQueue(ANIME_REFRESH_QUEUE, {
+        durable: true,
+        arguments: { 'x-dead-letter-exchange': ANIME_REFRESH_DLX }
+    })
+}

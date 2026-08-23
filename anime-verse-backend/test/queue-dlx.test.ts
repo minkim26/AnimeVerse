@@ -7,7 +7,7 @@ vi.mock('../lib/supabase.ts', async () => {
     return { default: supabaseMock }
 })
 
-import { AVATAR_QUEUE, AVATAR_DLQ, setupAvatarQueue } from '../lib/queue.ts'
+import { AVATAR_QUEUE, AVATAR_DLQ, setupAvatarQueue, ANIME_REFRESH_QUEUE, ANIME_REFRESH_DLQ, setupAnimeRefreshQueue } from '../lib/queue.ts'
 import { processThumbnailMessage } from '../consumer.ts'
 import { mockDownload } from './supabaseMock.ts'
 import redis from '../lib/redis.ts'
@@ -51,6 +51,45 @@ describe('avatar-thumbnails dead-letter routing', () => {
             await new Promise((resolve) => setTimeout(resolve, 200))
 
             const dlqMessage = await channel.get(AVATAR_DLQ, { noAck: true })
+            expect(dlqMessage).not.toBe(false)
+            if (dlqMessage !== false) {
+                expect(dlqMessage.content.toString()).toBe(payload.toString())
+            }
+
+            await conn.close()
+        },
+        10_000
+    )
+})
+
+describe('anime-cache-refresh dead-letter routing', () => {
+    it(
+        'routes a nack(requeue:false) message to the DLQ instead of dropping it',
+        async () => {
+            const conn = await amqplib.connect(process.env.RABBITMQ_URL || 'amqp://localhost')
+            const channel = await conn.createChannel()
+            await setupAnimeRefreshQueue(channel)
+
+            await channel.purgeQueue(ANIME_REFRESH_QUEUE)
+            await channel.purgeQueue(ANIME_REFRESH_DLQ)
+
+            const payload = Buffer.from(JSON.stringify({ animeId: 0 }))
+            channel.sendToQueue(ANIME_REFRESH_QUEUE, payload, { persistent: true })
+
+            const delivered = await new Promise<amqplib.ConsumeMessage>((resolve) => {
+                channel.consume(
+                    ANIME_REFRESH_QUEUE,
+                    (msg) => {
+                        if (msg) resolve(msg)
+                    },
+                    { noAck: false }
+                )
+            })
+            channel.nack(delivered, false, false)
+
+            await new Promise((resolve) => setTimeout(resolve, 200))
+
+            const dlqMessage = await channel.get(ANIME_REFRESH_DLQ, { noAck: true })
             expect(dlqMessage).not.toBe(false)
             if (dlqMessage !== false) {
                 expect(dlqMessage.content.toString()).toBe(payload.toString())

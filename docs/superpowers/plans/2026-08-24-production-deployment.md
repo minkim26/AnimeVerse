@@ -350,7 +350,7 @@ EOF
 ssh -i ~/.ssh/animeverse-vps ubuntu@<INSTANCE_PUBLIC_IP> \
   'cd ~/animeverse/anime-verse-backend && docker compose -f compose.prod.yml up -d --build'
 ```
-Building happens natively on the VPS, so Docker automatically pulls the correct architecture's manifest for `node:22-alpine`, `rabbitmq:4-management`, and `redis:7-alpine` with no cross-compilation step. This VPS is amd64, but the same command works unmodified regardless of architecture.
+Building happens natively on the VPS, so Docker automatically pulls the correct architecture's manifest for `node:22-alpine`, `rabbitmq:4-management`, and `redis:7-alpine` with no cross-compilation step. This VPS is amd64, but the same command works unmodified regardless of architecture. The same `up -d --build` also runs `migrate` first, since `api` and `consumer` both depend on it completing successfully, so this one command both applies any pending Prisma migration and starts the stack; there's no separate migration step to run by hand.
 
 On first run, `rabbitmq` becoming healthy can take a couple of minutes under this box's memory pressure (see the healthcheck comment in Step 1); `api`/`consumer` won't start until it does, since they depend on it. A `docker compose -f compose.prod.yml up -d` retry (no `--build` needed) after `rabbitmq` is confirmed healthy resolves a first-attempt startup-ordering race where `api`/`consumer` were evaluated as dependents before `rabbitmq` finished booting.
 

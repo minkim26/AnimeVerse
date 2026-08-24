@@ -14,7 +14,7 @@ if (!process.env.FRONTEND_URL) {
 const app = express()
 
 app.use(morgan('dev'))
-app.use(cors({ origin: process.env.FRONTEND_URL.split(',') }))
+app.use(cors({ origin: process.env.FRONTEND_URL.split(',').map((origin) => origin.trim()).filter(Boolean) }))
 app.use(express.json())
 app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff')

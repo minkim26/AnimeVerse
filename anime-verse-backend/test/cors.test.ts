@@ -9,7 +9,13 @@ describe('CORS', () => {
     // origin reflects back whichever configured origin actually matched the
     // request, not the raw env var string, and sets no ACAO header at all
     // when nothing matched.
-    const allowedOrigins = (process.env.FRONTEND_URL as string).split(',')
+    //
+    // CI sets FRONTEND_URL with a space after the comma, and these expected
+    // origins are hardcoded rather than re-derived by splitting FRONTEND_URL
+    // here: deriving them the same way app.ts does would make this test
+    // pass even if app.ts stopped trimming whitespace, since both sides
+    // would carry the same untrimmed value.
+    const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174']
 
     it('does not reflect an origin outside the configured list', async () => {
         const res = await request(app).get('/health').set('Origin', 'http://evil.example')
@@ -18,7 +24,7 @@ describe('CORS', () => {
         expect(res.headers['access-control-allow-origin']).toBeUndefined()
     })
 
-    it('allows each configured frontend origin', async () => {
+    it('allows each configured frontend origin, trimming whitespace after commas', async () => {
         for (const origin of allowedOrigins) {
             const res = await request(app).get('/health').set('Origin', origin)
             expect(res.headers['access-control-allow-origin']).toBe(origin)

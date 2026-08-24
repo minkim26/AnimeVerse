@@ -218,6 +218,12 @@ This is a standalone production file, not a `-f compose.yml -f compose.prod.yml`
 Create `anime-verse-backend/compose.prod.yml`:
 ```yaml
 services:
+  migrate:
+    build: .
+    env_file: .env.production
+    command: [ "npx", "prisma", "migrate", "deploy" ]
+    restart: "no"
+
   api:
     build: .
     env_file: .env.production
@@ -229,6 +235,8 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
         restart: true
@@ -248,6 +256,8 @@ services:
       retries: 5
       start_period: 10s
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
         restart: true
@@ -258,6 +268,8 @@ services:
   rabbitmq:
     image: rabbitmq:4-management
     restart: unless-stopped
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       # rabbitmq-diagnostics itself boots a small Erlang runtime to connect,
       # which on a constrained box (e.g. a 1GB-RAM e2-micro) can take ~25s
@@ -295,8 +307,9 @@ services:
 
 volumes:
   caddy_data:
+  rabbitmq_data:
 ```
-Unlike `compose.yml`, no service here publishes a host port except `caddy` (80/443). `rabbitmq`, `redis`, `api` (8000), and `consumer` (8001) stay reachable only from other containers on the compose-created network, matching the spec's firewall design.
+`migrate` runs `prisma migrate deploy` once and exits; `api` and `consumer` both wait on it completing successfully before they start, so a pending schema change from a new commit is applied before the new code that depends on it goes live. `rabbitmq_data` persists RabbitMQ's own durable storage (pending and dead-lettered messages) across container recreation, not just process restarts. Unlike `compose.yml`, no service here publishes a host port except `caddy` (80/443). `rabbitmq`, `redis`, `api` (8000), and `consumer` (8001) stay reachable only from other containers on the compose-created network, matching the spec's firewall design.
 
 - [ ] **Step 2: Write the Caddyfile**
 
@@ -470,6 +483,7 @@ Run the full manual smoke test from the spec:
 1. `curl -sf https://animeverse-app.duckdns.org/health`, expect 200.
 2. Sign up for a new account through the deployed frontend (the Cloudflare Workers URL), confirm login round-trips against the real Supabase Postgres.
 3. Upload an avatar from the profile page, confirm the "Generating thumbnail..." state resolves once `consumer` finishes processing it (checks the full RabbitMQ → `consumer` → Supabase Storage path end to end).
-4. `gh run list --workflow=deploy.yml --limit 1` after merging to `main` and pushing a trivial follow-up commit, confirming it ran and succeeded.
 
-All four must pass before considering this deployment live. `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` in `.env.example` remain accurate for local dev (`compose.yml` is untouched) but are correctly absent from the production `.env.production` written in Task 4.
+All three must pass before considering this deployment live. `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB` in `.env.example` remain accurate for local dev (`compose.yml` is untouched) but are correctly absent from the production `.env.production` written in Task 4.
+
+Once Task 5 is done: `gh run list --workflow=deploy.yml --limit 1` after merging to `main` and pushing a trivial follow-up commit, confirming it ran and succeeded. This is Task 5's own acceptance check, not part of the live-deployment criteria above.

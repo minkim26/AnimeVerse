@@ -194,13 +194,17 @@ function TitleGenerator() {
     setTitle(await getRandomTitle())
   }
 
+  useEffect(() => {
+    fetchTitle()
+  }, [])
+
   return (
-    <section className="col-span-6 md:col-span-2 surface-card p-6 flex flex-col">
+    <section className="col-span-6 md:col-span-2 surface-card p-6 flex flex-col items-center text-center">
       <h2 className="font-display text-lg font-semibold tracking-tight mb-2 text-[var(--color-ink)]">
         Random Anime Title Generator
       </h2>
       <p className="text-sm text-[var(--color-muted)] mb-4 flex-1">
-        {title ? `${title.title} — ${title.episodes} episodes` : 'Click the button to get a title.'}
+        {title ? `${title.title} — ${title.episodes} episodes` : 'Fetching title...'}
       </p>
       <button onClick={fetchTitle} className="btn btn-outline text-sm px-5 py-2.5 w-fit">
         Random Anime Title
@@ -212,23 +216,32 @@ function TitleGenerator() {
 function QuoteGenerator() {
   const [quote, setQuote] = useState<Quote | null>(null)
 
+  async function fetchQuote() {
+    setQuote(await getRandomQuote())
+  }
+
   useEffect(() => {
-    getRandomQuote().then(setQuote)
+    fetchQuote()
   }, [])
 
   return (
-    <section className="col-span-6 md:col-span-2 surface-card p-6">
+    <section className="col-span-6 md:col-span-2 surface-card p-6 flex flex-col items-center text-center">
       <h2 className="font-display text-lg font-semibold tracking-tight mb-2 text-[var(--color-ink)]">
         Random Anime Quote
       </h2>
-      {quote ? (
-        <p className="text-sm text-[var(--color-muted)]">
-          "{quote.quote}" — <strong className="text-[var(--color-text)]">{quote.character}</strong>,{' '}
-          <em>{quote.anime}</em>
-        </p>
-      ) : (
-        <p className="text-sm text-[var(--color-muted)]">Fetching quote...</p>
-      )}
+      <p className="text-sm text-[var(--color-muted)] mb-4 flex-1">
+        {quote ? (
+          <>
+            "{quote.quote}" — <strong className="text-[var(--color-text)]">{quote.character}</strong>,{' '}
+            <em>{quote.anime}</em>
+          </>
+        ) : (
+          'Fetching quote...'
+        )}
+      </p>
+      <button onClick={fetchQuote} className="btn btn-outline text-sm px-5 py-2.5 w-fit">
+        Random Anime Quote
+      </button>
     </section>
   )
 }
@@ -253,7 +266,7 @@ function RandomAnimeGenerator() {
   }
 
   return (
-    <section className="col-span-6 md:col-span-2 surface-card p-6">
+    <section className="col-span-6 md:col-span-2 surface-card p-6 flex flex-col items-center text-center">
       <h2 className="font-display text-lg font-semibold tracking-tight mb-2 text-[var(--color-ink)]">
         Random Anime Picture Generator
       </h2>
@@ -277,7 +290,7 @@ function RandomAnimeGenerator() {
           )}
         </button>
       )}
-      <button onClick={handleRefresh} className="btn btn-outline text-sm px-5 py-2.5">
+      <button onClick={handleRefresh} className="btn btn-outline text-sm px-5 py-2.5 w-fit">
         Random Anime Picture
       </button>
     </section>

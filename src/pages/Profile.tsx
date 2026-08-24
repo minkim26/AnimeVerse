@@ -190,8 +190,8 @@ function PreferencesSummary() {
 function TitleGenerator() {
   const [title, setTitle] = useState<Title | null>(null)
 
-  async function fetchTitle() {
-    setTitle(await getRandomTitle())
+  function fetchTitle() {
+    return getRandomTitle().then(setTitle)
   }
 
   useEffect(() => {
@@ -216,8 +216,8 @@ function TitleGenerator() {
 function QuoteGenerator() {
   const [quote, setQuote] = useState<Quote | null>(null)
 
-  async function fetchQuote() {
-    setQuote(await getRandomQuote())
+  function fetchQuote() {
+    return getRandomQuote().then(setQuote)
   }
 
   useEffect(() => {

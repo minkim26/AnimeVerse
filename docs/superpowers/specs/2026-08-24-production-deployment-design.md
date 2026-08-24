@@ -63,13 +63,17 @@ Oracle's free ARM capacity is reported as inconsistent to provision in some regi
 
 Base image: Ubuntu, with Docker Engine + the Compose plugin installed. Firewall: only 22 (SSH) and 80/443 (Caddy) open publicly. RabbitMQ's management UI (15672), Redis (6379), and the app's own ports (8000/8001) stay internal to the Compose network, not published to the VPS's public interface, unlike local dev's `compose.yml`, which maps them to host ports for developer convenience.
 
+Oracle's networking has two independent layers, and both need 80/443 opened: the cloud-level Security List (or Network Security Group) in the console, and the instance's own OS firewall. Oracle's Ubuntu images ship with restrictive default `iptables` rules that block inbound traffic even after the Security List allows it, and this is a common source of "it's provisioned but I can't reach it" confusion.
+
 ### 2. `compose.yml` changes for production
 
-Local dev's `compose.yml` stays untouched. Production adds a `compose.prod.yml` override file (standard Compose multi-file pattern: `docker compose -f compose.yml -f compose.prod.yml up -d --build api consumer rabbitmq redis caddy`) that:
+Local dev's `compose.yml` stays untouched. Production gets its own standalone `compose.prod.yml`, not a Compose override merged with `-f compose.yml -f compose.prod.yml`: `api` and `consumer` both declare `depends_on: postgres` and `depends_on: initdb` in the base file, and Compose starts a named service's dependencies regardless of which services you list on the `up` command line, so an override approach would drag `postgres`/`initdb` back in by default. A standalone file that simply never mentions them sidesteps this instead of fighting Compose's merge semantics.
 
-- Explicitly names only `api`, `consumer`, `rabbitmq`, `redis`, `caddy` in the `up` command: `postgres` and `initdb` stay defined in the shared base file (harmless, simply never started in production) rather than requiring YAML tricks to un-declare them.
-- Removes the host port publishes for `rabbitmq` and `redis` (internal-only in production).
-- Adds a `caddy` service: reverse-proxies `yourapp.duckdns.org` to `api:8000`, terminates TLS automatically via Caddy's built-in Let's Encrypt client. One `Caddyfile`, checked into the repo (no secrets in it).
+`compose.prod.yml` defines exactly five services:
+
+- `api`, `consumer`: same `build: .` and `env_file: .env.production` as local dev, `depends_on` trimmed to `rabbitmq` and `redis` only (no `postgres`/`initdb`: Postgres is now Supabase, reached over the network like any other external service).
+- `rabbitmq`, `redis`: same images as local dev, no host port publishes (internal-only in production, unlike local dev's convenience mappings).
+- `caddy`: reverse-proxies `yourapp.duckdns.org` to `api:8000`, terminates TLS automatically via Caddy's built-in Let's Encrypt client. One `Caddyfile`, checked into the repo (no secrets in it).
 
 `.env.production` (already gitignored, lives only on the VPS) gets real values for `ADMIN_CRON_SECRET`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_KEY`, the Supabase Postgres connection string, `RABBITMQ_URL`, `REDIS_URL`, and `FRONTEND_URL` (the Cloudflare Pages URL).
 
@@ -79,7 +83,9 @@ DuckDNS gives a free subdomain (`yourapp.duckdns.org`). Oracle's free VM keeps a
 
 ### 4. Deploy pipeline
 
-A new `deploy.yml` workflow, triggered by `workflow_run` on `ci.yml`'s completion (success only) for pushes to `main`: it deploys only after `frontend`/`backend`/`e2e` all pass, never before. It SSHes into the VPS and runs `git pull && docker compose -f compose.yml -f compose.prod.yml up -d --build api consumer rabbitmq redis caddy`.
+A new `deploy.yml` workflow, triggered by `workflow_run` on `ci.yml`'s completion (success only) for pushes to `main`: it deploys only after `frontend`/`backend`/`e2e` all pass, never before. It SSHes into the VPS and runs `git pull && docker compose -f compose.prod.yml up -d --build`.
+
+`workflow_run` only fires for workflow files that already exist on the repository's default branch, so `deploy.yml` will not trigger from a feature branch. It only starts working once merged to `main`.
 
 Building natively on the VPS via SSH (rather than building an image on GitHub's amd64 runners and pushing it) sidesteps ARM cross-compilation entirely. Docker automatically pulls the correct architecture's manifest for the base images (`node:22-alpine`, `rabbitmq:4-management`, `redis:7-alpine`) when building directly on the ARM host.
 
@@ -106,5 +112,5 @@ Run `npx prisma migrate deploy` once against the Supabase connection string, the
 
 ## Testing Approach
 
-- **Manual smoke test after first deploy:** hit `/health` on `api` and `consumer` through the public domain, verify a login/signup round-trips against the real Supabase Postgres, verify an avatar upload round-trips through `consumer`'s thumbnail pipeline end to end.
+- **Manual smoke test after first deploy:** hit `/health` on `api` through the public domain (`https://yourapp.duckdns.org/health`); `consumer`'s `/health` stays internal per the firewall design above, so check it over SSH instead (`docker compose -f compose.prod.yml exec consumer wget -qO- http://localhost:8001/health`). Verify a login/signup round-trips against the real Supabase Postgres, and an avatar upload round-trips through `consumer`'s thumbnail pipeline end to end.
 - **No new automated tests.** This is infrastructure, not application code. Existing CI (`frontend`/`backend`/`e2e`) is unaffected and continues gating merges to `main` exactly as before; `deploy.yml` only runs after those checks already passed.

@@ -34,7 +34,7 @@ GitHub (push to main)
   |
   |-- Cloudflare Workers (own GitHub integration, auto-deploy) --> frontend (static Vite build)
   |
-  `-- ci.yml (frontend/backend/e2e) --> on success --> deploy.yml (new)
+  `-- ci.yml (frontend/backend/e2e) --> on success --> deploy.yml (planned, not yet built)
                                                             |
                                                           SSH
                                                             |
@@ -87,6 +87,8 @@ DuckDNS gives a free subdomain. `animeverse.duckdns.org` was already taken by an
 
 ### 4. Deploy pipeline
 
+**Status: designed, not yet built.** Task 5 of the implementation plan (below) was never executed, so `.github/workflows/deploy.yml` doesn't exist yet and every deploy so far has been the manual SSH command from Task 4. The design below is what that task will produce once it's done.
+
 A new `deploy.yml` workflow, triggered by `workflow_run` on `ci.yml`'s completion (success only) for pushes to `main`: it deploys only after `frontend`/`backend`/`e2e` all pass, never before. It SSHes into the VPS and runs `git pull && docker compose -f compose.prod.yml up -d --build`.
 
 `workflow_run` only fires for workflow files that already exist on the repository's default branch, so `deploy.yml` will not trigger from a feature branch. It only starts working once merged to `main`.
@@ -114,10 +116,10 @@ Run `npx prisma migrate deploy` once against the Supabase connection string, the
 - **Single point of failure.** The VPS going down takes `api`, `consumer`, `rabbitmq`, and `redis` down together. Accepted for portfolio scale.
 - **Ephemeral GCP IP.** The VM uses GCP's default ephemeral external IP rather than a reserved static one, which would have cost nothing extra while attached. If the VM is ever stopped and restarted, its IP can change, silently breaking the DuckDNS A record until manually updated.
 - **1 GB RAM is workable but slow.** The full stack builds and runs correctly on `e2-micro`, but a cold build takes 15-20 minutes due to swap-heavy disk I/O, and RabbitMQ specifically needs generous healthcheck timing (see Component 2) to avoid being marked unhealthy during its own slow startup.
-- **No RabbitMQ/Redis backups.** Accepted: both are ephemeral and rebuildable. Redis is pure cache, and RabbitMQ queues drain naturally on restart. Postgres backups are Supabase's responsibility on their free tier.
+- **No RabbitMQ/Redis backups.** Accepted: Redis is pure cache, safe to lose. RabbitMQ persists its queues to a named volume (`rabbitmq_data`), so pending and dead-lettered messages survive a container restart or recreation, but the volume itself isn't backed up. Postgres backups are Supabase's responsibility on their free tier.
 - **No monitoring beyond Docker's restart policy.** If the VPS itself hangs, or the Docker daemon dies, nothing pages anyone. Acceptable for a resume project; revisit only if this becomes more than a demo.
 
 ## Testing Approach
 
 - **Manual smoke test after first deploy:** hit `/health` on `api` through the public domain (`https://animeverse-app.duckdns.org/health`); `consumer`'s `/health` stays internal per the firewall design above, so check it over SSH instead (`docker compose -f compose.prod.yml exec consumer wget -qO- http://localhost:8001/health`). Verify a login/signup round-trips against the real Supabase Postgres, and an avatar upload round-trips through `consumer`'s thumbnail pipeline end to end.
-- **No new automated tests.** This is infrastructure, not application code. Existing CI (`frontend`/`backend`/`e2e`) is unaffected and continues gating merges to `main` exactly as before; `deploy.yml` only runs after those checks already passed.
+- **No new automated tests.** This is infrastructure, not application code. Existing CI (`frontend`/`backend`/`e2e`) is unaffected and continues gating merges to `main` exactly as before. Once `deploy.yml` is built (see Component 4), it's designed to only run after those checks already passed.

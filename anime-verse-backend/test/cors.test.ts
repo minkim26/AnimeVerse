@@ -4,18 +4,25 @@ import request from 'supertest'
 import app from '../app.ts'
 
 describe('CORS', () => {
-    it('pins Access-Control-Allow-Origin to FRONTEND_URL rather than reflecting the request Origin', async () => {
+    // FRONTEND_URL is a comma-separated list (e.g. local dev needs both the
+    // normal :5173 origin and Playwright's :5174 one). cors() with an array
+    // origin reflects back whichever configured origin actually matched the
+    // request, not the raw env var string, and sets no ACAO header at all
+    // when nothing matched.
+    const allowedOrigins = (process.env.FRONTEND_URL as string).split(',')
+
+    it('does not reflect an origin outside the configured list', async () => {
         const res = await request(app).get('/health').set('Origin', 'http://evil.example')
 
         expect(res.status).toBe(200)
-        expect(res.headers['access-control-allow-origin']).toBe(process.env.FRONTEND_URL)
-        expect(res.headers['access-control-allow-origin']).not.toBe('http://evil.example')
+        expect(res.headers['access-control-allow-origin']).toBeUndefined()
     })
 
-    it('allows the configured frontend origin', async () => {
-        const res = await request(app).get('/health').set('Origin', process.env.FRONTEND_URL as string)
-
-        expect(res.headers['access-control-allow-origin']).toBe(process.env.FRONTEND_URL)
+    it('allows each configured frontend origin', async () => {
+        for (const origin of allowedOrigins) {
+            const res = await request(app).get('/health').set('Origin', origin)
+            expect(res.headers['access-control-allow-origin']).toBe(origin)
+        }
     })
 })
 

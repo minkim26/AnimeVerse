@@ -13,6 +13,13 @@ if (!process.env.FRONTEND_URL) {
 
 const app = express()
 
+// Production runs behind exactly one reverse proxy (Caddy, see
+// compose.prod.yml). Without this, req.ip is Caddy's own container address
+// for every request, so IP-keyed rate limiting (authLimiter in
+// lib/rateLimit.ts) would share one budget across all users instead of
+// limiting each client separately.
+app.set('trust proxy', 1)
+
 app.use(morgan('dev'))
 app.use(cors({ origin: process.env.FRONTEND_URL.split(',').map((origin) => origin.trim()).filter(Boolean) }))
 app.use(express.json())

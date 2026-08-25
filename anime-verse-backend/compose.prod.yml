@@ -1,53 +1,48 @@
+x-app: &app
+  build: .
+  env_file: .env.production
+  restart: unless-stopped
+
+x-app-depends-on: &app-depends-on
+  migrate:
+    condition: service_completed_successfully
+  rabbitmq:
+    condition: service_healthy
+    restart: true
+  redis:
+    condition: service_healthy
+    restart: true
+
 services:
   migrate:
-    build: .
-    env_file: .env.production
+    <<: *app
     command: [ "npx", "prisma", "migrate", "deploy" ]
     restart: "no"
 
   api:
-    build: .
-    env_file: .env.production
-    restart: unless-stopped
+    <<: *app
     healthcheck:
       test: [ "CMD", "node", "-e", "fetch('http://localhost:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
-        restart: true
-      redis:
-        condition: service_healthy
-        restart: true
+    depends_on: *app-depends-on
 
   consumer:
-    build: .
-    env_file: .env.production
+    <<: *app
     command: [ "sh", "-c", "npm run prestart && npx tsx consumer.ts" ]
-    restart: unless-stopped
     healthcheck:
       test: [ "CMD", "node", "-e", "fetch('http://localhost:8001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
-        restart: true
-      redis:
-        condition: service_healthy
-        restart: true
+    depends_on: *app-depends-on
 
   rabbitmq:
     image: rabbitmq:4-management
+    hostname: rabbitmq
     restart: unless-stopped
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq

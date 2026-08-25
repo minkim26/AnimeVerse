@@ -71,9 +71,10 @@ Base image: Ubuntu 24.04 LTS, with Docker Engine + the Compose plugin installed 
 
 Local dev's `compose.yml` stays untouched. Production gets its own standalone `compose.prod.yml`, not a Compose override merged with `-f compose.yml -f compose.prod.yml`: `api` and `consumer` both declare `depends_on: postgres` and `depends_on: initdb` in the base file, and Compose starts a named service's dependencies regardless of which services you list on the `up` command line, so an override approach would drag `postgres`/`initdb` back in by default. A standalone file that simply never mentions them sidesteps this instead of fighting Compose's merge semantics.
 
-`compose.prod.yml` defines exactly five services:
+`compose.prod.yml` defines six services:
 
-- `api`, `consumer`: same `build: .` and `env_file: .env.production` as local dev, `depends_on` trimmed to `rabbitmq` and `redis` only (no `postgres`/`initdb`: Postgres is now Supabase, reached over the network like any other external service).
+- `migrate`: runs `prisma migrate deploy` once and exits; `api` and `consumer` both wait for it to complete successfully before starting.
+- `api`, `consumer`: same `build: .` and `env_file: .env.production` as local dev, with no `postgres`/`initdb` dependency (Postgres is now Supabase, reached over the network like any other external service).
 - `rabbitmq`, `redis`: same images as local dev, no host port publishes (internal-only in production, unlike local dev's convenience mappings).
 - `caddy`: reverse-proxies `animeverse-app.duckdns.org` to `api:8000`, terminates TLS automatically via Caddy's built-in Let's Encrypt client. One `Caddyfile`, checked into the repo (no secrets in it).
 
@@ -116,7 +117,7 @@ Run `npx prisma migrate deploy` once against the Supabase connection string, the
 - **Single point of failure.** The VPS going down takes `api`, `consumer`, `rabbitmq`, and `redis` down together. Accepted for portfolio scale.
 - **Ephemeral GCP IP.** The VM uses GCP's default ephemeral external IP rather than a reserved static one, which would have cost nothing extra while attached. If the VM is ever stopped and restarted, its IP can change, silently breaking the DuckDNS A record until manually updated.
 - **1 GB RAM is workable but slow.** The full stack builds and runs correctly on `e2-micro`, but a cold build takes 15-20 minutes due to swap-heavy disk I/O, and RabbitMQ specifically needs generous healthcheck timing (see Component 2) to avoid being marked unhealthy during its own slow startup.
-- **No RabbitMQ/Redis backups.** Accepted: Redis is pure cache, safe to lose. RabbitMQ persists its queues to a named volume (`rabbitmq_data`), so pending and dead-lettered messages survive a container restart or recreation, but the volume itself isn't backed up. Postgres backups are Supabase's responsibility on their free tier.
+- **No RabbitMQ/Redis backups.** Accepted: Redis is pure cache, safe to lose. RabbitMQ persists its queues to a named volume (`rabbitmq_data`) with a pinned `hostname: rabbitmq`, so pending and dead-lettered messages survive a container restart or recreation, but the volume itself isn't backed up. (RabbitMQ names its Mnesia data directory after the node name; without the pinned hostname, a recreated container would get Docker's default random hostname and open a different, empty directory, making the volume's actual contents invisible even though nothing was deleted.) Postgres backups are Supabase's responsibility on their free tier.
 - **No monitoring beyond Docker's restart policy.** If the VPS itself hangs, or the Docker daemon dies, nothing pages anyone. Acceptable for a resume project; revisit only if this becomes more than a demo.
 
 ## Testing Approach

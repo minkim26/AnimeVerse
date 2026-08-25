@@ -182,7 +182,7 @@ POSTGRES_URL="<the connection string from Step 2>" npx prisma migrate deploy
 This can fail with Prisma error P3005 ("the database schema is not empty"), even though none of this app's tables exist yet: a fresh Supabase project already has its own `keep_alive` table and the `vector` extension's own objects in the `public` schema, which trips Prisma's first-deploy safety check. If that happens, apply each migration's SQL directly instead, then tell Prisma's tracking table they're accounted for:
 ```bash
 for dir in prisma/migrations/*/; do
-  PGPASSWORD="<your Supabase DB password>" psql "postgresql://postgres.<ref>@aws-<n>-<region>.pooler.supabase.com:5432/postgres" -v ON_ERROR_STOP=1 -f "${dir}migration.sql"
+  PGPASSWORD="<your Supabase DB password>" psql "postgresql://postgres.<ref>@aws-<n>-<region>.pooler.supabase.com:5432/postgres" -v ON_ERROR_STOP=1 -f "${dir}migration.sql" || { echo "Migration failed: ${dir}migration.sql" >&2; exit 1; }
 done
 for dir in prisma/migrations/*/; do
   POSTGRES_URL="<the connection string from Step 2>" npx prisma migrate resolve --applied "$(basename "$dir")"
@@ -217,56 +217,51 @@ This is a standalone production file, not a `-f compose.yml -f compose.prod.yml`
 
 Create `anime-verse-backend/compose.prod.yml`:
 ```yaml
+x-app: &app
+  build: .
+  env_file: .env.production
+  restart: unless-stopped
+
+x-app-depends-on: &app-depends-on
+  migrate:
+    condition: service_completed_successfully
+  rabbitmq:
+    condition: service_healthy
+    restart: true
+  redis:
+    condition: service_healthy
+    restart: true
+
 services:
   migrate:
-    build: .
-    env_file: .env.production
+    <<: *app
     command: [ "npx", "prisma", "migrate", "deploy" ]
     restart: "no"
 
   api:
-    build: .
-    env_file: .env.production
-    restart: unless-stopped
+    <<: *app
     healthcheck:
       test: [ "CMD", "node", "-e", "fetch('http://localhost:8000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
-        restart: true
-      redis:
-        condition: service_healthy
-        restart: true
+    depends_on: *app-depends-on
 
   consumer:
-    build: .
-    env_file: .env.production
+    <<: *app
     command: [ "sh", "-c", "npm run prestart && npx tsx consumer.ts" ]
-    restart: unless-stopped
     healthcheck:
       test: [ "CMD", "node", "-e", "fetch('http://localhost:8001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
-        restart: true
-      redis:
-        condition: service_healthy
-        restart: true
+    depends_on: *app-depends-on
 
   rabbitmq:
     image: rabbitmq:4-management
+    hostname: rabbitmq
     restart: unless-stopped
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
@@ -309,7 +304,7 @@ volumes:
   caddy_data:
   rabbitmq_data:
 ```
-`migrate` runs `prisma migrate deploy` once and exits; `api` and `consumer` both wait on it completing successfully before they start, so a pending schema change from a new commit is applied before the new code that depends on it goes live. `rabbitmq_data` persists RabbitMQ's own durable storage (pending and dead-lettered messages) across container recreation, not just process restarts. Unlike `compose.yml`, no service here publishes a host port except `caddy` (80/443). `rabbitmq`, `redis`, `api` (8000), and `consumer` (8001) stay reachable only from other containers on the compose-created network, matching the spec's firewall design.
+`migrate` runs `prisma migrate deploy` once and exits; `api` and `consumer` both wait on it completing successfully before they start, so a pending schema change from a new commit is applied before the new code that depends on it goes live. `rabbitmq` sets an explicit `hostname` because RabbitMQ names its Mnesia data directory after the node name (`rabbit@<hostname>`); without a fixed hostname, a recreated container gets Docker's default random hostname and opens a different (empty) directory, silently orphaning the `rabbitmq_data` volume's actual contents. `rabbitmq_data` persists RabbitMQ's own durable storage (pending and dead-lettered messages) across container recreation, not just process restarts, now that the hostname is stable. `api`, `consumer`, and `migrate` share their `build`/`env_file`/`restart` via the `x-app` anchor, and `api`/`consumer` share their `depends_on` via `x-app-depends-on`, since all three (or two) blocks were previously identical. Unlike `compose.yml`, no service here publishes a host port except `caddy` (80/443). `rabbitmq`, `redis`, `api` (8000), and `consumer` (8001) stay reachable only from other containers on the compose-created network, matching the spec's firewall design.
 
 - [ ] **Step 2: Write the Caddyfile**
 

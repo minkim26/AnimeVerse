@@ -189,9 +189,15 @@ function PreferencesSummary() {
 
 function TitleGenerator() {
   const [title, setTitle] = useState<Title | null>(null)
+  const [error, setError] = useState(false)
 
   function fetchTitle() {
-    return getRandomTitle().then(setTitle)
+    return getRandomTitle()
+      .then((t) => {
+        setTitle(t)
+        setError(false)
+      })
+      .catch(() => setError(true))
   }
 
   useEffect(() => {
@@ -204,7 +210,11 @@ function TitleGenerator() {
         Random Anime Title Generator
       </h2>
       <p className="text-sm text-[var(--color-muted)] mb-4 flex-1">
-        {title ? `${title.title} — ${title.episodes} episodes` : 'Fetching title...'}
+        {error
+          ? 'Could not load a title. Try again.'
+          : title
+            ? `${title.title} — ${title.episodes} episodes`
+            : 'Fetching title...'}
       </p>
       <button onClick={fetchTitle} className="btn btn-outline text-sm px-5 py-2.5 w-fit">
         Random Anime Title
@@ -215,9 +225,15 @@ function TitleGenerator() {
 
 function QuoteGenerator() {
   const [quote, setQuote] = useState<Quote | null>(null)
+  const [error, setError] = useState(false)
 
   function fetchQuote() {
-    return getRandomQuote().then(setQuote)
+    return getRandomQuote()
+      .then((q) => {
+        setQuote(q)
+        setError(false)
+      })
+      .catch(() => setError(true))
   }
 
   useEffect(() => {
@@ -230,7 +246,9 @@ function QuoteGenerator() {
         Random Anime Quote
       </h2>
       <p className="text-sm text-[var(--color-muted)] mb-4 flex-1">
-        {quote ? (
+        {error ? (
+          'Could not load a quote. Try again.'
+        ) : quote ? (
           <>
             "{quote.quote}" — <strong className="text-[var(--color-text)]">{quote.character}</strong>,{' '}
             <em>{quote.anime}</em>
@@ -250,6 +268,7 @@ function RandomAnimeGenerator() {
   const [anime, setAnime] = useState<{ title: string; imageUrl: string; description: string } | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const [showAdultContent, setShowAdultContent] = useState(false)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     getPreferences()
@@ -257,12 +276,21 @@ function RandomAnimeGenerator() {
         setShowAdultContent(prefs.showAdultContent)
         return fetchRandomAnime(prefs.showAdultContent)
       })
-      .then(setAnime)
+      .then((a) => {
+        setAnime(a)
+        setError(false)
+      })
+      .catch(() => setError(true))
   }, [])
 
   function handleRefresh() {
     setShowDetails(false)
-    fetchRandomAnime(showAdultContent).then(setAnime)
+    fetchRandomAnime(showAdultContent)
+      .then((a) => {
+        setAnime(a)
+        setError(false)
+      })
+      .catch(() => setError(true))
   }
 
   return (
@@ -271,7 +299,7 @@ function RandomAnimeGenerator() {
         Random Anime Picture Generator
       </h2>
       <p className="text-xs text-[var(--color-muted)] mb-3">
-        (Click on the image to see the description and title.)
+        {error ? 'Could not load an anime. Try again.' : '(Click on the image to see the description and title.)'}
       </p>
       {anime && (
         <button

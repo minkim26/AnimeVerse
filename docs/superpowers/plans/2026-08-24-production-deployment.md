@@ -396,7 +396,7 @@ git commit -m "Add production Compose file and Caddy reverse proxy"
 
 **Interfaces:**
 - Consumes: SSH access to the VPS from Task 1 (as GitHub repo secrets, not hardcoded).
-- Produces: automatic redeploys on every successful `ci.yml` run on `main`.
+- Produces: automatic redeploys on every successful `ci.yml` run on `main`, each recorded as a GitHub Deployment against a `production` environment with `environment_url` set to `https://animeverse-app.duckdns.org`, visible at github.com/minkim26/AnimeVerse/deployments. Nothing posts to that API today; its only entries right now are leftovers from the old, removed `github-pages` workflow.
 
 - [ ] **Step 1: Add the SSH deploy key as a GitHub repo secret**
 
@@ -420,11 +420,22 @@ on:
     types: [completed]
     branches: [main]
 
+permissions:
+  deployments: write
+
 jobs:
   deploy:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
+      - name: Create GitHub deployment
+        id: deployment
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: '${{ github.token }}'
+          environment: production
+          environment-url: https://animeverse-app.duckdns.org
+
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1
         with:
@@ -436,7 +447,25 @@ jobs:
             git pull
             cd anime-verse-backend
             docker compose -f compose.prod.yml up -d --build
+
+      - name: Mark deployment successful
+        if: success()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: '${{ github.token }}'
+          state: success
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+          environment-url: https://animeverse-app.duckdns.org
+
+      - name: Mark deployment failed
+        if: failure()
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: '${{ github.token }}'
+          state: failure
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
 ```
+`permissions: deployments: write` is required: the default `GITHUB_TOKEN` only gets `contents: read` unless a workflow explicitly asks for more, and creating or updating a Deployment needs `deployments: write` specifically. `chrnorm/deployment-action` and `chrnorm/deployment-status` are a widely-used complementary pair built for exactly this: the first creates the Deployment and outputs its `deployment_id`, the second updates that same deployment's status afterward. The failure path deliberately doesn't set `environment-url`, since a failed deploy shouldn't claim the new state is live at that URL.
 
 - [ ] **Step 3: Validate the YAML**
 

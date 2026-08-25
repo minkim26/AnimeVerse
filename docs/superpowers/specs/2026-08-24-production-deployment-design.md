@@ -102,6 +102,8 @@ Building natively on the VPS via SSH was originally motivated by avoiding ARM cr
 
 New GitHub repo secrets: `VPS_SSH_HOST`, `VPS_SSH_USER`, `VPS_SSH_PRIVATE_KEY`.
 
+Each successful deploy also registers a GitHub Deployment against a `production` environment, `environment_url` set to the live domain, visible at github.com/minkim26/AnimeVerse/deployments. Nothing posts to that API today; the three entries there now are leftovers from the old, removed `github-pages` workflow. See the plan's Task 5 for the exact steps (`chrnorm/deployment-action` / `chrnorm/deployment-status`), and note that this needs a `permissions: deployments: write` block, since the default `GITHUB_TOKEN` only carries `contents: read`.
+
 Frontend deploy is unaffected: Cloudflare's own GitHub integration handles that independently, no custom Actions job needed.
 
 ### 5. Postgres migration to Supabase

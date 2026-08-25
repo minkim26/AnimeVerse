@@ -223,7 +223,7 @@ The frontend deploys to Cloudflare Workers (static assets) from `main`, live at 
 
 The backend runs on a GCP `e2-micro` VPS through `anime-verse-backend/compose.prod.yml`: `api`, `consumer`, `rabbitmq`, and `redis` in Docker Compose, with Caddy in front handling automatic TLS. It's live at https://animeverse-app.duckdns.org. Postgres runs on Supabase rather than self-hosted, connected through its session pooler (Supabase's direct connection dropped free IPv4 support, and the VPS only has IPv4).
 
-The `e2-micro` instance itself is free, but GCP has charged for a VM's external IP address since February 2024, so this deployment runs at roughly $3.65/month rather than $0. See the design spec's "Real recurring cost" and "Roadmap" sections below for the full breakdown and a genuinely $0/month serverless alternative that isn't built yet.
+The `e2-micro` instance itself is free, but GCP has charged for a VM's external IP address since February 2024, so this deployment runs at roughly $3.65/month rather than $0. See the design spec's "Real recurring cost" and "Roadmap" sections below for the full breakdown and a serverless alternative, not built yet, that would actually reach $0/month.
 
 Backend deploys are manual for now: SSH into the VPS, `git pull`, then `docker compose -f compose.prod.yml up -d --build`. An auto-deploy workflow (`deploy.yml`, triggered on a successful `CI` run against `main`) is designed in the spec/plan below but not yet built.
 

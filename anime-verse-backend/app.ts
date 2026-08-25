@@ -21,7 +21,7 @@ const app = express()
 app.set('trust proxy', 1)
 
 app.use(morgan('dev'))
-app.use(cors({ origin: process.env.FRONTEND_URL }))
+app.use(cors({ origin: process.env.FRONTEND_URL.split(',').map((origin) => origin.trim()).filter(Boolean) }))
 app.use(express.json())
 app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff')

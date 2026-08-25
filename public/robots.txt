@@ -1,8 +1,7 @@
-# The Sitemap URL below uses a placeholder domain (animeverse.example)
-# because no production host is configured yet. Update it — and every
-# <loc> in sitemap.xml — to the real domain once one exists. Files in
-# public/ are copied to dist/ as-is by Vite, so VITE_SITE_URL can't be
-# substituted into them the way it is in index.html.
+# Files in public/ are copied to dist/ as-is by Vite, so VITE_SITE_URL
+# can't be substituted into them the way it is in index.html — this
+# domain (and every <loc> in sitemap.xml) has to be updated by hand if
+# the production domain ever changes.
 
 User-agent: *
 Allow: /
@@ -58,4 +57,4 @@ Disallow: /
 User-agent: YouBot
 Disallow: /
 
-Sitemap: https://animeverse.example/sitemap.xml
+Sitemap: https://animeverse.minkim26.tech/sitemap.xml

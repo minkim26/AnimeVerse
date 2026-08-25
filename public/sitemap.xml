@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://animeverse.example/</loc>
+    <loc>https://animeverse.minkim26.tech/</loc>
   </url>
   <url>
-    <loc>https://animeverse.example/login</loc>
+    <loc>https://animeverse.minkim26.tech/login</loc>
   </url>
   <url>
-    <loc>https://animeverse.example/signup</loc>
+    <loc>https://animeverse.minkim26.tech/signup</loc>
   </url>
   <url>
-    <loc>https://animeverse.example/privacy-policy</loc>
+    <loc>https://animeverse.minkim26.tech/privacy-policy</loc>
   </url>
 </urlset>

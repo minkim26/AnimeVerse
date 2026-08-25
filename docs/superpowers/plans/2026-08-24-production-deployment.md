@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Read the "Execution Model" note below before starting.** Unlike a typical code plan, several tasks here require the human operator's own browser/account access and cannot be completed by an agent alone.
 
-**Goal:** Get AnimeVerse reachable at a public URL for $0/month, with `api` and `consumer` running continuously (no cold starts) on a free-tier VPS, Postgres moved to Supabase, and auto-deploy on push to `main`.
+**Goal:** Get AnimeVerse reachable at a public URL for close to $0/month, with `api` and `consumer` running continuously (no cold starts) on a free-tier VPS, Postgres moved to Supabase, and auto-deploy on push to `main`. (The $0 goal isn't fully met: GCP charges for the VM's external IP. See the spec's "Real recurring cost" under Component 1.)
 
 **Architecture:** A GCP `e2-micro` VPS (Oracle Cloud was the original plan; its Ampere A1 tier never had available capacity, see Task 1) runs `api`, `consumer`, `rabbitmq`, `redis`, and a new `caddy` reverse proxy via a standalone `compose.prod.yml`. Postgres moves to the Supabase project already used for avatar Storage. A DuckDNS subdomain points at the VPS's IP; Caddy handles TLS automatically. A new `deploy.yml` GitHub Actions workflow SSHes in and redeploys on every successful `main` build.
 
@@ -18,7 +18,7 @@ Practically: an operator (the user) handles the one browser-only step in Task 1 
 
 ## Global Constraints
 
-- $0/month recurring cost: every choice in this plan follows the spec's free-tier decisions (GCP Always Free, Supabase free tier, DuckDNS, Cloudflare Workers already in place for the frontend).
+- $0/month recurring cost: every choice in this plan follows the spec's free-tier decisions (GCP Always Free, Supabase free tier, DuckDNS, Cloudflare Workers already in place for the frontend). In practice this VPS still costs ~$3.65/month for its external IP, since GCP started charging for those in February 2024 and Always Free doesn't cover it; see the spec's "Real recurring cost."
 - No application code changes. Every file this plan creates is new infrastructure config (`compose.prod.yml`, `Caddyfile`, `.github/workflows/deploy.yml`); nothing in `src/` or `anime-verse-backend/{api,lib,consumer.ts}` changes.
 - Commit messages: plain, direct, no conventional-commit prefixes (`feat:`, `fix:`, etc.), no AI attribution, matching this repo's existing convention.
 - `.env.production` never gets committed (already gitignored): it's populated directly on the VPS, not through git.

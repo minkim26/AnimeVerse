@@ -187,17 +187,19 @@ function PreferencesSummary() {
   )
 }
 
+function settle<T>(promise: Promise<T>, setValue: (value: T) => void, setError: (value: boolean) => void) {
+  return promise.then((value) => {
+    setValue(value)
+    setError(false)
+  }).catch(() => setError(true))
+}
+
 function TitleGenerator() {
   const [title, setTitle] = useState<Title | null>(null)
   const [error, setError] = useState(false)
 
   function fetchTitle() {
-    return getRandomTitle()
-      .then((t) => {
-        setTitle(t)
-        setError(false)
-      })
-      .catch(() => setError(true))
+    return settle(getRandomTitle(), setTitle, setError)
   }
 
   useEffect(() => {
@@ -228,12 +230,7 @@ function QuoteGenerator() {
   const [error, setError] = useState(false)
 
   function fetchQuote() {
-    return getRandomQuote()
-      .then((q) => {
-        setQuote(q)
-        setError(false)
-      })
-      .catch(() => setError(true))
+    return settle(getRandomQuote(), setQuote, setError)
   }
 
   useEffect(() => {
@@ -271,26 +268,19 @@ function RandomAnimeGenerator() {
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    getPreferences()
-      .then((prefs) => {
+    settle(
+      getPreferences().then((prefs) => {
         setShowAdultContent(prefs.showAdultContent)
         return fetchRandomAnime(prefs.showAdultContent)
-      })
-      .then((a) => {
-        setAnime(a)
-        setError(false)
-      })
-      .catch(() => setError(true))
+      }),
+      setAnime,
+      setError,
+    )
   }, [])
 
   function handleRefresh() {
     setShowDetails(false)
-    fetchRandomAnime(showAdultContent)
-      .then((a) => {
-        setAnime(a)
-        setError(false)
-      })
-      .catch(() => setError(true))
+    settle(fetchRandomAnime(showAdultContent), setAnime, setError)
   }
 
   return (

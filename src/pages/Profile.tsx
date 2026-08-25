@@ -187,20 +187,36 @@ function PreferencesSummary() {
   )
 }
 
+function settle<T>(promise: Promise<T>, setValue: (value: T) => void, setError: (value: boolean) => void) {
+  return promise.then((value) => {
+    setValue(value)
+    setError(false)
+  }).catch(() => setError(true))
+}
+
 function TitleGenerator() {
   const [title, setTitle] = useState<Title | null>(null)
+  const [error, setError] = useState(false)
 
-  async function fetchTitle() {
-    setTitle(await getRandomTitle())
+  function fetchTitle() {
+    return settle(getRandomTitle(), setTitle, setError)
   }
 
+  useEffect(() => {
+    fetchTitle()
+  }, [])
+
   return (
-    <section className="col-span-6 md:col-span-2 surface-card p-6 flex flex-col">
+    <section className="col-span-6 md:col-span-2 surface-card p-6 flex flex-col items-center text-center">
       <h2 className="font-display text-lg font-semibold tracking-tight mb-2 text-[var(--color-ink)]">
         Random Anime Title Generator
       </h2>
       <p className="text-sm text-[var(--color-muted)] mb-4 flex-1">
-        {title ? `${title.title} — ${title.episodes} episodes` : 'Click the button to get a title.'}
+        {error
+          ? 'Could not load a title. Try again.'
+          : title
+            ? `${title.title} — ${title.episodes} episodes`
+            : 'Fetching title...'}
       </p>
       <button onClick={fetchTitle} className="btn btn-outline text-sm px-5 py-2.5 w-fit">
         Random Anime Title
@@ -211,24 +227,36 @@ function TitleGenerator() {
 
 function QuoteGenerator() {
   const [quote, setQuote] = useState<Quote | null>(null)
+  const [error, setError] = useState(false)
+
+  function fetchQuote() {
+    return settle(getRandomQuote(), setQuote, setError)
+  }
 
   useEffect(() => {
-    getRandomQuote().then(setQuote)
+    fetchQuote()
   }, [])
 
   return (
-    <section className="col-span-6 md:col-span-2 surface-card p-6">
+    <section className="col-span-6 md:col-span-2 surface-card p-6 flex flex-col items-center text-center">
       <h2 className="font-display text-lg font-semibold tracking-tight mb-2 text-[var(--color-ink)]">
         Random Anime Quote
       </h2>
-      {quote ? (
-        <p className="text-sm text-[var(--color-muted)]">
-          "{quote.quote}" — <strong className="text-[var(--color-text)]">{quote.character}</strong>,{' '}
-          <em>{quote.anime}</em>
-        </p>
-      ) : (
-        <p className="text-sm text-[var(--color-muted)]">Fetching quote...</p>
-      )}
+      <p className="text-sm text-[var(--color-muted)] mb-4 flex-1">
+        {error ? (
+          'Could not load a quote. Try again.'
+        ) : quote ? (
+          <>
+            "{quote.quote}" — <strong className="text-[var(--color-text)]">{quote.character}</strong>,{' '}
+            <em>{quote.anime}</em>
+          </>
+        ) : (
+          'Fetching quote...'
+        )}
+      </p>
+      <button onClick={fetchQuote} className="btn btn-outline text-sm px-5 py-2.5 w-fit">
+        Random Anime Quote
+      </button>
     </section>
   )
 }
@@ -237,28 +265,31 @@ function RandomAnimeGenerator() {
   const [anime, setAnime] = useState<{ title: string; imageUrl: string; description: string } | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const [showAdultContent, setShowAdultContent] = useState(false)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
-    getPreferences()
-      .then((prefs) => {
+    settle(
+      getPreferences().then((prefs) => {
         setShowAdultContent(prefs.showAdultContent)
         return fetchRandomAnime(prefs.showAdultContent)
-      })
-      .then(setAnime)
+      }),
+      setAnime,
+      setError,
+    )
   }, [])
 
   function handleRefresh() {
     setShowDetails(false)
-    fetchRandomAnime(showAdultContent).then(setAnime)
+    settle(fetchRandomAnime(showAdultContent), setAnime, setError)
   }
 
   return (
-    <section className="col-span-6 md:col-span-2 surface-card p-6">
+    <section className="col-span-6 md:col-span-2 surface-card p-6 flex flex-col items-center text-center">
       <h2 className="font-display text-lg font-semibold tracking-tight mb-2 text-[var(--color-ink)]">
         Random Anime Picture Generator
       </h2>
       <p className="text-xs text-[var(--color-muted)] mb-3">
-        (Click on the image to see the description and title.)
+        {error ? 'Could not load an anime. Try again.' : '(Click on the image to see the description and title.)'}
       </p>
       {anime && (
         <button
@@ -277,7 +308,7 @@ function RandomAnimeGenerator() {
           )}
         </button>
       )}
-      <button onClick={handleRefresh} className="btn btn-outline text-sm px-5 py-2.5">
+      <button onClick={handleRefresh} className="btn btn-outline text-sm px-5 py-2.5 w-fit">
         Random Anime Picture
       </button>
     </section>

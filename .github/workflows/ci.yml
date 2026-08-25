@@ -65,7 +65,9 @@ jobs:
     env:
       POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/animeverse
       JWT_SECRET: ci-test-jwt-secret-not-for-production-use
-      FRONTEND_URL: http://localhost:5173
+      # Space after the comma is deliberate: exercises cors.test.ts's check
+      # that app.ts trims each origin rather than matching it literally.
+      FRONTEND_URL: "http://localhost:5173, http://localhost:5174"
       REDIS_URL: redis://localhost:6379
       RABBITMQ_URL: amqp://localhost
       SUPABASE_URL: https://fake.supabase.co

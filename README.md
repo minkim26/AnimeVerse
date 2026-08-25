@@ -219,12 +219,12 @@ A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_
 
 ## Deployment
 
-The frontend deploys to Cloudflare Workers (static assets) from `main`, live at https://animeverse.minsteww26.workers.dev. Cloudflare's GitHub integration builds and deploys on every push, no extra workflow needed.
+The frontend deploys to Cloudflare Workers (static assets) from `main`, live at https://animeverse.minkim26.tech. Cloudflare's GitHub integration builds and deploys on every push, no extra workflow needed.
 
-The backend runs on a GCP `e2-micro` VPS through `anime-verse-backend/compose.prod.yml`: `api`, `consumer`, `rabbitmq`, and `redis` in Docker Compose, with Caddy in front handling automatic TLS. It's live at https://animeverse-app.duckdns.org. Postgres runs on Supabase rather than self-hosted, connected through its session pooler (Supabase's direct connection dropped free IPv4 support, and the VPS only has IPv4).
+The backend runs on an LXC container on a home-lab Proxmox host, through `anime-verse-backend/compose.prod.yml`: `api`, `consumer`, `rabbitmq`, `redis`, and `cloudflared` in Docker Compose. `cloudflared` opens an outbound-only Cloudflare Tunnel, so the box has no public IP and no inbound ports at all; Cloudflare's edge terminates TLS and proxies `https://api.minkim26.tech` straight to it. Postgres runs on Supabase rather than self-hosted, connected through its session pooler.
 
-The `e2-micro` instance itself is free, but GCP has charged for a VM's external IP address since February 2024, so this deployment runs at roughly $3.65/month rather than $0. See the design spec's "Real recurring cost" and "Roadmap" sections below for the full breakdown and a serverless alternative, not built yet, that would actually reach $0/month.
+This setup has no ongoing hosting cost — no VM, no reserved IP, nothing billed. A previous iteration ran on a GCP `e2-micro` VM (`https://animeverse-app.duckdns.org`), which did carry a real ~$3.65/month charge for its external IP; that VM is being decommissioned now that the Proxmox setup is verified.
 
-Backend deploys are manual for now: SSH into the VPS, `git pull`, then `docker compose -f compose.prod.yml up -d --build`. An auto-deploy workflow (`deploy.yml`, triggered on a successful `CI` run against `main`) is designed in the spec/plan below but not yet built.
+Backend deploys are automatic: `.github/workflows/deploy.yml` triggers on a successful `CI` run against `main`, joins the home-lab's Tailscale network (the deploy target has no public IP either), and runs `git pull && docker compose -f compose.prod.yml up -d --build` over SSH.
 
-The full provisioning steps and the reasoning behind each choice live in `docs/superpowers/specs/2026-08-24-production-deployment-design.md` and `docs/superpowers/plans/2026-08-24-production-deployment.md`.
+The full provisioning steps and the reasoning behind each choice — including the original GCP-based design and the cost analysis that motivated the move off it — live in `docs/superpowers/specs/2026-08-24-production-deployment-design.md` and `docs/superpowers/plans/2026-08-24-production-deployment.md`.

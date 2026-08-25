@@ -1,5 +1,7 @@
 # Production Deployment
 
+> **Superseded.** This document describes the original GCP + DuckDNS + Caddy design and the ~$3.65/month cost gap it shipped with. The backend was later moved to a home-lab Proxmox LXC reached through a Cloudflare Tunnel, which actually reaches the $0/month goal below and needs no public IP at all. See CLAUDE.md's Known Quirks and README.md's Deployment section for the current, accurate picture. This document is kept for the reasoning behind the original choices (Oracle/GCP trade-offs, DuckDNS, the cost analysis) — the goals and cost figures below reflect that design, not the current one.
+
 ## Overview
 
 AnimeVerse had no production deployment target before this. The old GitHub Pages workflow was gone, `ci.yml` only lints/builds/tests with no deploy step, and a real host was needed before the app was reachable outside local dev. This closes that gap using the app's existing Docker images and Compose setup almost unchanged, at close to $0/month. See CLAUDE.md's Architecture section and README.md's Deployment section for where things ended up; this document covers the reasoning and the parts of the plan that changed once real provisioning started.

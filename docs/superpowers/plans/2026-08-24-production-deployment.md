@@ -4,7 +4,7 @@
 
 **Goal:** Get AnimeVerse reachable at a public URL for close to $0/month, with `api` and `consumer` running continuously (no cold starts) on a free-tier VPS, Postgres moved to Supabase, and auto-deploy on push to `main`. (The $0 goal isn't fully met: GCP charges for the VM's external IP. See the spec's "Real recurring cost" under Component 1.)
 
-**Architecture:** A GCP `e2-micro` VPS (Oracle Cloud was the original plan; its Ampere A1 tier never had available capacity, see Task 1) runs `api`, `consumer`, `rabbitmq`, `redis`, and a new `caddy` reverse proxy via a standalone `compose.prod.yml`. Postgres moves to the Supabase project already used for avatar Storage. A DuckDNS subdomain points at the VPS's IP; Caddy handles TLS automatically. A new `deploy.yml` GitHub Actions workflow SSHes in and redeploys on every successful `main` build.
+**Architecture:** A GCP `e2-micro` VPS (Oracle Cloud was the original plan; its Ampere A1 tier never had available capacity, see Task 1) runs `api`, `consumer`, `rabbitmq`, `redis`, and a new `caddy` reverse proxy via a standalone `compose.prod.yml`. Postgres moves to the Supabase project already used for avatar Storage. A DuckDNS subdomain points at the VPS's IP; Caddy handles TLS automatically. A planned `deploy.yml` GitHub Actions workflow will SSH in and redeploy after every successful `main` build, but it isn't built yet (see Task 5).
 
 **Tech Stack:** Docker Compose, Caddy (reverse proxy + automatic TLS), GCP `e2-micro` (amd64), Supabase Postgres (pgvector, session pooler), DuckDNS, GitHub Actions (`workflow_run`, SSH deploy).
 
@@ -197,6 +197,22 @@ PGPASSWORD="<your Supabase DB password>" psql "postgresql://postgres.<ref>@aws-<
 ```
 Expected: all 5 migrations listed with `finished = t`. (`prisma migrate status`'s own summary line can read as "0 applied, 0 pending" even when everything is correctly applied; it means nothing new happened on that particular invocation, not that nothing is applied. Check the actual `_prisma_migrations` table, as above, for ground truth.)
 
+- [ ] **Step 5: Seed the static Quote/Title data**
+
+Migrations only create empty tables. Local dev's `compose.yml` seeds them via its `initdb` service, but `compose.prod.yml` (Task 4) only runs `prisma migrate deploy`, on purpose: `prisma/seed.ts` uses `createMany` with no unique constraint on `Quote`/`Title`, so re-running it on every deploy would insert duplicate rows. A one-time manual seed here, the same pattern Step 3 above already used for the migration workaround, avoids that without needing to make the seed script idempotent.
+
+```bash
+POSTGRES_URL="<the connection string from Step 2>" npm run initdb
+```
+This reuses the project's own local-dev seed path (`preinitdb` re-runs `prisma migrate deploy`, harmless since it's already applied, then `prisma generate`; `initdb` then runs `prisma/seed.ts`). Without this, `GET /quotes/random` and `GET /titles/random` return successfully but empty, and the Profile page's title/quote widgets never populate.
+
+- [ ] **Step 6: Verify**
+
+```bash
+PGPASSWORD="<your Supabase DB password>" psql "postgresql://postgres.<ref>@aws-<n>-<region>.pooler.supabase.com:5432/postgres" -c "SELECT (SELECT count(*) FROM \"Quote\") AS quotes, (SELECT count(*) FROM \"Title\") AS titles;"
+```
+Expected: nonzero counts for both.
+
 Record the connection string from Step 2: Task 4's `.env.production` needs it.
 
 ---
@@ -323,9 +339,9 @@ ssh -i ~/.ssh/animeverse-vps ubuntu@<INSTANCE_PUBLIC_IP> \
   'git clone https://github.com/minkim26/AnimeVerse.git ~/animeverse'
 ```
 
-Then create `.env.production` directly on the VPS (it's gitignored, so it never travels through git):
+Then create `.env.production` directly on the VPS (it's gitignored, so it never travels through git). It holds the database password, JWT secret, cron secret, and Supabase service-role key, so it's created at mode 600 up front rather than left at the VPS's default umask (typically 644, readable by every local account):
 ```bash
-ssh -i ~/.ssh/animeverse-vps ubuntu@<INSTANCE_PUBLIC_IP> 'cat > ~/animeverse/anime-verse-backend/.env.production' <<'EOF'
+ssh -i ~/.ssh/animeverse-vps ubuntu@<INSTANCE_PUBLIC_IP> 'install -m 600 /dev/null ~/animeverse/anime-verse-backend/.env.production && cat > ~/animeverse/anime-verse-backend/.env.production' <<'EOF'
 POSTGRES_URL=<the Supabase connection string from Task 3>
 JWT_SECRET=<a long random value, e.g. output of `openssl rand -hex 32`>
 ADMIN_CRON_SECRET=<a long random value, at least 32 characters, required by lib/adminAuth.ts>

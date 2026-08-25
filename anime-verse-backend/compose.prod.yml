@@ -68,19 +68,17 @@ services:
       retries: 5
       start_period: 5s
 
-  caddy:
-    image: caddy:2-alpine
+  # Remotely-managed Cloudflare Tunnel: outbound-only connection to
+  # Cloudflare's edge, which terminates TLS and proxies api.<domain> traffic
+  # here. No inbound ports needed on the host, unlike the Caddy setup this
+  # replaced.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddyfile:ro
-      - caddy_data:/data
-    command: caddy run --config /etc/caddyfile
+    command: tunnel --no-autoupdate run
+    env_file: .env.production
     depends_on:
       - api
 
 volumes:
-  caddy_data:
   rabbitmq_data:

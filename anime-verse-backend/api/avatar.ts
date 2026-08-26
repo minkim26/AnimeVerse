@@ -65,6 +65,43 @@ export function mimeToExt(mimetype: string): string {
  * saves that URL on the user, then publishes a RabbitMQ message so
  * consumer.ts can generate a thumbnail asynchronously.
  */
+/**
+ * @openapi
+ * /avatar:
+ *   post:
+ *     tags: [Avatar]
+ *     summary: Upload a new profile picture
+ *     description: Rate limited to 20 requests / hour / user. Response returns the original's URL immediately; `avatarThumbnailUrl` on GET /users/me only appears once consumer.ts finishes generating it.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary, description: 'JPEG, PNG, GIF, or WebP, up to 5MB' }
+ *     responses:
+ *       201:
+ *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 avatarUrl: { type: string }
+ *       400:
+ *         description: Missing file, unreadable image, or an unsupported format
+ *       401:
+ *         description: Missing or invalid token
+ *       413:
+ *         description: File over the 5MB limit
+ *       429:
+ *         description: Rate limit exceeded
+ *       503:
+ *         description: Supabase Storage temporarily unavailable
+ */
 router.post('/', requireAuth, uploadLimiter, upload.single('file'), async (req: AuthenticatedRequest, res) => {
     if (!req.file) {
         return res.status(400).send({ error: 'A file field containing an image is required' })

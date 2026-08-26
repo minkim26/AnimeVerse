@@ -2,10 +2,12 @@ import express from 'express'
 import cors from 'cors'
 import morgan from 'morgan'
 import multer from 'multer'
+import swaggerUi from 'swagger-ui-express'
 import * as z from 'zod'
 import { Prisma } from './generated/prisma/client.ts'
 
 import api from './api/index.ts'
+import openapiSpec from './lib/swagger.ts'
 
 if (!process.env.FRONTEND_URL) {
     throw new Error('FRONTEND_URL must be set — cors() falls back to allowing all origins otherwise')
@@ -13,9 +15,9 @@ if (!process.env.FRONTEND_URL) {
 
 const app = express()
 
-// Production runs behind exactly one reverse proxy (Caddy, see
-// compose.prod.yml). Without this, req.ip is Caddy's own container address
-// for every request, so IP-keyed rate limiting (authLimiter in
+// Production runs behind Cloudflare's tunnel/edge (see compose.prod.yml's
+// cloudflared service). Without this, req.ip is the tunnel's own container
+// address for every request, so IP-keyed rate limiting (authLimiter in
 // lib/rateLimit.ts) would share one budget across all users instead of
 // limiting each client separately.
 app.set('trust proxy', 1)
@@ -30,9 +32,27 @@ app.use((req, res, next) => {
     next()
 })
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: Liveness check
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: ok }
+ */
 app.get('/health', (req, res) => {
     res.status(200).send({ status: 'ok' })
 })
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(openapiSpec))
 
 /*
  * All routes for the API are written in modules in the api/ directory.  The

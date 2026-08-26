@@ -21,6 +21,37 @@ const BCRYPT_COST_FACTOR = 10
  *
  * Returns: 201 { id } on success
  */
+/**
+ * @openapi
+ * /users:
+ *   post:
+ *     tags: [Users]
+ *     summary: Register a new user
+ *     description: Rate limited to 10 requests / 15 min / IP.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email: { type: string, format: email }
+ *               password: { type: string, minLength: 8 }
+ *     responses:
+ *       201:
+ *         description: Created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: integer }
+ *       400:
+ *         description: Invalid body, or the email is already registered (same generic message either way)
+ *       429:
+ *         description: Rate limit exceeded
+ */
 router.post('/', authLimiter, async (req, res) => {
     const data = User.parse(req.body)
 
@@ -53,6 +84,37 @@ router.post('/', authLimiter, async (req, res) => {
  *
  * Returns: 200 { token } on success, 401 on any other outcome
  */
+/**
+ * @openapi
+ * /users/login:
+ *   post:
+ *     tags: [Users]
+ *     summary: Log in and receive a JWT
+ *     description: Rate limited to 10 requests / 15 min / IP. Returns 401 for a bad password, an unknown email, or a malformed body alike, so a failure never reveals which case it was.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email: { type: string, format: email }
+ *               password: { type: string }
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 token: { type: string, description: 'JWT, valid 24h' }
+ *       401:
+ *         description: Invalid credentials
+ *       429:
+ *         description: Rate limit exceeded
+ */
 router.post('/login', authLimiter, async (req, res) => {
     const result = User.safeParse(req.body)
     if (!result.success) {
@@ -73,6 +135,31 @@ router.post('/login', authLimiter, async (req, res) => {
  * GET /users/me — Fetch the authenticated user's profile (excluding
  * their password hash). Cached in Redis — invalidated by any endpoint that
  * changes a field this response includes (avatar upload, password change).
+ */
+/**
+ * @openapi
+ * /users/me:
+ *   get:
+ *     tags: [Users]
+ *     summary: Get the authenticated user's profile
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: integer }
+ *                 email: { type: string }
+ *                 avatarUrl: { type: string, nullable: true }
+ *                 avatarThumbnailUrl: { type: string, nullable: true, description: 'Populated once consumer.ts finishes generating it; null right after upload' }
+ *                 createdAt: { type: string, format: date-time }
+ *       401:
+ *         description: Missing or invalid token
+ *       404:
+ *         description: User not found
  */
 router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
     const cacheKey = userCacheKey(req.user!.id)
@@ -97,6 +184,34 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
  * The caller must supply their current password; we re-verify it with
  * bcrypt.compare() before allowing the change (same behavior the old
  * server.js already had for /api/updatePassword).
+ */
+/**
+ * @openapi
+ * /users/me/password:
+ *   patch:
+ *     tags: [Users]
+ *     summary: Change the authenticated user's password
+ *     description: Revokes every JWT issued before this change, so other logged-in sessions are signed out.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [oldPassword, newPassword]
+ *             properties:
+ *               oldPassword: { type: string }
+ *               newPassword: { type: string, minLength: 8 }
+ *     responses:
+ *       204:
+ *         description: Password updated
+ *       400:
+ *         description: oldPassword is incorrect
+ *       401:
+ *         description: Missing or invalid token
+ *       404:
+ *         description: User not found
  */
 router.patch('/me/password', requireAuth, async (req: AuthenticatedRequest, res) => {
     const data = UpdatePassword.parse(req.body)

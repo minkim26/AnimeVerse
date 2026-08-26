@@ -27,6 +27,34 @@ interface RecommendationRow {
  * with nothing to invalidate. See
  * docs/superpowers/specs/2026-08-10-recommendation-engine-design.md.
  */
+/**
+ * @openapi
+ * /recommendations/for-you:
+ *   get:
+ *     tags: [Recommendations]
+ *     summary: Get personalized anime recommendations
+ *     description: Excludes every anime the caller has already swiped. Adult titles are excluded unless the caller's saved preferences set showAdultContent. Returns an empty list if the caller hasn't swiped anything yet.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: OK, up to 12 results ordered by taste-vector similarity
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 recommendations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       title: { type: string }
+ *                       posterUrl: { type: string, nullable: true }
+ *                       synopsis: { type: string }
+ *       401:
+ *         description: Missing or invalid token
+ */
 router.get('/for-you', requireAuth, async (req: AuthenticatedRequest, res) => {
     const swiped = await prisma.$queryRaw<SwipedVectorRow[]>`
         SELECT s.action, a."tasteVector"::text AS vector

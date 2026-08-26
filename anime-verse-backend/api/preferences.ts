@@ -15,6 +15,26 @@ const PREFERENCES_CACHE_TTL_SECONDS = 5 * 60
  * hidden if the user has never saved preferences. Cached in Redis; PUT
  * /preferences/me invalidates this on every write.
  */
+/**
+ * @openapi
+ * /preferences/me:
+ *   get:
+ *     tags: [Preferences]
+ *     summary: Get the authenticated user's saved preferences
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: 'OK — { genres: [], showAdultContent: false } if never saved'
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 genres: { type: array, items: { type: string } }
+ *                 showAdultContent: { type: boolean }
+ *       401:
+ *         description: Missing or invalid token
+ */
 router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
     const cacheKey = preferencesCacheKey(req.user!.id)
     const cached = await getJSON(cacheKey)
@@ -36,6 +56,35 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
  * adult-content setting.
  *
  * Upsert because a user may not have a Preference row yet (first save).
+ */
+/**
+ * @openapi
+ * /preferences/me:
+ *   put:
+ *     tags: [Preferences]
+ *     summary: Full-replace the authenticated user's preferences
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               genres: { type: array, items: { type: string, maxLength: 50 }, maxItems: 50, default: [] }
+ *               showAdultContent: { type: boolean, default: false }
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 genres: { type: array, items: { type: string } }
+ *                 showAdultContent: { type: boolean }
+ *       401:
+ *         description: Missing or invalid token
  */
 router.put('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
     const data = Preferences.parse(req.body)

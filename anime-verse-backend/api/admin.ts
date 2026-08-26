@@ -40,6 +40,27 @@ async function getChannel(): Promise<amqplib.Channel> {
  * req/min limit. This handler itself does no AniList calls, so it
  * returns immediately regardless of batch size.
  */
+/**
+ * @openapi
+ * /admin/anime-cache/refresh:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Enqueue a batch of Anime rows for AniList re-verification
+ *     description: Called daily by .github/workflows/refresh-anime-cache.yml, not intended for interactive use. Enqueues the 25 least-recently-verified rows; consumer.ts does the actual AniList re-fetch asynchronously.
+ *     security: [{ cronSecret: [] }]
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 enqueued: { type: integer }
+ *                 animeIds: { type: array, items: { type: integer } }
+ *       401:
+ *         description: Missing or invalid X-Cron-Secret header
+ */
 router.post('/anime-cache/refresh', requireCronSecret, async (req, res) => {
     // random() as the tiebreak on lastVerifiedAt ties rotates which rows
     // win across calls. A fixed tiebreak (id, insertion order, anything

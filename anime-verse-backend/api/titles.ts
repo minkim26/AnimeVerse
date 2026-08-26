@@ -14,6 +14,23 @@ const CACHE_TTL_SECONDS = 60 * 60
  * doesn't round-trip Postgres on every call; the random pick still happens
  * per-request against the cached list.
  */
+/**
+ * @openapi
+ * /titles/random:
+ *   get:
+ *     tags: [Titles]
+ *     summary: Get a random anime title
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 title: { type: string }
+ *                 episodes: { type: integer }
+ */
 router.get('/random', async (req, res) => {
     const titles = await getOrSetJSON(TITLES_CACHE_KEY, CACHE_TTL_SECONDS, () => prisma.title.findMany())
     const title = titles[Math.floor(Math.random() * titles.length)]

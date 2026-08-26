@@ -14,6 +14,24 @@ const CACHE_TTL_SECONDS = 60 * 60
  * doesn't round-trip Postgres on every call; the random pick still happens
  * per-request against the cached list.
  */
+/**
+ * @openapi
+ * /quotes/random:
+ *   get:
+ *     tags: [Quotes]
+ *     summary: Get a random anime quote
+ *     responses:
+ *       200:
+ *         description: OK
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 quote: { type: string }
+ *                 character: { type: string }
+ *                 anime: { type: string }
+ */
 router.get('/random', async (req, res) => {
     const quotes = await getOrSetJSON(QUOTES_CACHE_KEY, CACHE_TTL_SECONDS, () => prisma.quote.findMany())
     const quote = quotes[Math.floor(Math.random() * quotes.length)]

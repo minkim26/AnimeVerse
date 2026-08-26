@@ -14,7 +14,8 @@ Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
                                    |-- Prisma ------> Postgres (users, preferences, watchlist,
                                    |                   reviews, quotes, titles, anime cache, swipes)
                                    |
-                                   |-- Redis -------> rate limiting (auth, avatar upload)
+                                   |-- Redis -------> rate limiting (avatar upload, swipes,
+                                   |                   watchlist, reviews)
                                    |                   + response cache (users/me, preferences/me,
                                    |                   quotes/random, titles/random)
                                    |
@@ -52,8 +53,8 @@ No application-level reverse proxy or API gateway sits between the frontend and 
 
 ## Request flow: a typical authenticated request
 
-1. Browser sends a request with `Authorization: Bearer <jwt>` (attached by `src/services/api.ts`).
-2. Express's `requireAuth` middleware (`lib/auth.ts`) verifies the JWT and attaches `req.user = { id: <userId> }` — the `userId` comes from the JWT's `sub` claim, stored as a string per JWT convention and parsed back to a number.
+1. Browser sends a request with `Authorization: Bearer <access token>` (fetched from Auth0 and attached by `src/services/api.ts`).
+2. Express's `requireAuth` middleware (`lib/auth.ts`) verifies the token (RS256-via-JWKS against the Auth0 tenant in production; HS256 against a shared test secret in the test suite), then resolves Auth0's opaque `sub` claim to a local `User` row via the `auth0Id` column and attaches `req.user = { id: <userId> }`. A `sub` with no matching `auth0Id` — one that has never called `POST /users/sync` — 404s here instead of resolving.
 3. The route handler validates the request body with a Zod schema (`lib/zod.ts`), then reads/writes via Prisma, scoped to `req.user.id`. There is no separate authorization layer — ownership is enforced by always filtering/writing on the authenticated user's own ID, never a client-supplied one.
 4. Errors thrown by Zod or Prisma are caught by `server.ts`'s centralized error handler and translated to an HTTP status (`ZodError` → 400, Prisma `P2003` invalid foreign key → 400, Prisma `P2025` record not found → falls through to the 404 handler).
 
@@ -72,9 +73,9 @@ See [avatar-upload-pipeline.md](avatar-upload-pipeline.md) for the full walkthro
 
 Both live in `lib/redis.ts`, `lib/cache.ts`, and `lib/rateLimit.ts`.
 
-- **Rate limited** (`express-rate-limit` + `rate-limit-redis`, so limits are shared across all `api` instances rather than per-process): `POST /users` and `POST /users/login` (10 requests / 15 min, keyed by IP), and `POST /avatar` (20 requests / hour, keyed by authenticated user ID).
+- **Rate limited** (`express-rate-limit` + `rate-limit-redis`, so limits are shared across all `api` instances rather than per-process, keyed by authenticated user ID): `POST /avatar` (20 requests / hour), `POST /swipes` (200 requests / hour), and writes to `/watchlist` and `/reviews` (100 requests / hour each).
 - **Cached, read-through, no invalidation needed**: `GET /quotes/random` and `GET /titles/random` cache the full seeded list for 1 hour — the random pick still happens per-request against the cached list. There's no write path for these tables at runtime, so there's nothing to invalidate.
-- **Cached with explicit invalidation**: `GET /users/me` and `GET /preferences/me` (5 min TTL as a safety net). Every endpoint that mutates a field either response includes explicitly busts the corresponding key: `PATCH /users/me/password` and `POST /avatar` invalidate the user cache; `PUT /preferences/me` invalidates the preferences cache. Notably, **`consumer.ts` also invalidates the user cache** after it writes `avatarThumbnailUrl` — that field is a different process than the one that populated the cache, so without this the frontend could see a stale cached response even after the thumbnail finishes generating.
+- **Cached with explicit invalidation**: `GET /users/me` and `GET /preferences/me` (5 min TTL as a safety net). Every endpoint that mutates a field either response includes explicitly busts the corresponding key: `POST /avatar` invalidates the user cache; `PUT /preferences/me` invalidates the preferences cache. Notably, **`consumer.ts` also invalidates the user cache** after it writes `avatarThumbnailUrl` — that field is a different process than the one that populated the cache, so without this the frontend could see a stale cached response even after the thumbnail finishes generating.
 
 ## Data model
 
@@ -93,7 +94,7 @@ Title   (no user association — static seed content)
 
 ## Why Supabase is Storage-only
 
-Auth and primary data live in Postgres via Prisma with self-issued JWTs, not Supabase Auth or Supabase's hosted Postgres. This was a deliberate choice made during the modernization rewrite to keep authentication self-contained (matching the pattern from `assignment-3-minkim26`) while still getting Supabase's managed object storage for user-uploaded avatar images and generated thumbnails — the one place in the app where real binary file storage is actually needed.
+Primary data lives in Postgres via Prisma, not Supabase's hosted Postgres. Auth is handled by Auth0 (see above), not Supabase Auth. Supabase is used only for its managed object storage, for user-uploaded avatar images and generated thumbnails — the one place in the app where real binary file storage is actually needed.
 
 ## CI
 

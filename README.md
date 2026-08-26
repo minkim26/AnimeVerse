@@ -8,11 +8,11 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 
 ## Features
 
-- **Signup / Login:** email + password auth against the API, JWT stored in `localStorage`.
+- **Signup / Login:** Auth0's hosted Universal Login, backed by an access token Auth0 issues.
 - **Discover:** swipe (skip / like / love) through an AniList-backed deck; each swipe feeds a taste vector computed fresh from your swipe history.
 - **Explore:** "For You" picks ranked by taste-vector similarity, plus Browse & Search (genre chips, sort, and text search against AniList's full catalog).
-- **Profile:** change password, upload a real profile picture (async thumbnail generation), view saved preferences, and fetch a random anime, anime title, and anime quote.
-- **Auth gating:** `/preferences`, `/discover`, `/explore`, and `/profile` redirect to `/login` if no token is present (see `src/components/ProtectedRoute.tsx`).
+- **Profile:** upload a real profile picture (async thumbnail generation), view saved preferences, and fetch a random anime, anime title, and anime quote.
+- **Auth gating:** `/preferences`, `/discover`, `/explore`, and `/profile` redirect to `/login` unless Auth0 reports an authenticated session (see `src/components/ProtectedRoute.tsx`).
 
 ## Tech Stack
 
@@ -20,10 +20,10 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 |---|---|
 | Frontend | React 19 + Vite 7 + TypeScript, Tailwind CSS v4, react-router v8 |
 | Backend | Express 5 + TypeScript, Prisma 7 (Postgres + pgvector), Zod 4 validation |
-| Auth | Self-issued JWTs (`jsonwebtoken` + `bcryptjs`), not a third-party auth provider |
+| Auth | Auth0 (hosted Universal Login, RS256-via-JWKS token verification) |
 | File storage | Supabase Storage (avatar originals + generated thumbnails) |
 | Async processing | RabbitMQ + a standalone `consumer.ts` worker using `sharp` for thumbnailing |
-| Caching / rate limiting | Redis (`express-rate-limit` + `rate-limit-redis` on auth/avatar endpoints, response caching on read-heavy GETs) |
+| Caching / rate limiting | Redis (`express-rate-limit` + `rate-limit-redis` on avatar/swipes/watchlist/reviews endpoints, response caching on read-heavy GETs) |
 | API docs | OpenAPI, served live at `/api-docs` |
 | Orchestration | Docker Compose (`api`, `consumer`, `postgres`, `rabbitmq`, `redis`, `initdb`) |
 
@@ -124,7 +124,7 @@ A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_
 - Watchlist and Reviews have full Prisma models and REST endpoints but no frontend UI. Nothing in the app calls them.
 - The backend is a single Proxmox host with no redundancy. If it goes down, `api`, `consumer`, `rabbitmq`, `redis`, and `cloudflared` all go down together, taking the public site with them since `cloudflared` is the only path in. Accepted trade-off at this app's scale.
 - `rabbitmq` and `redis` have no backups. Redis is pure cache, safe to lose. RabbitMQ persists its queues to the `rabbitmq_data` volume, so pending and dead-lettered messages survive a container restart or recreation, but not a lost or deleted volume.
-- The Playwright E2E suite drives a real signup/login and lets the browser hit AniList's real GraphQL API. Nothing is mocked, so a slow AniList response can fail the suite even when the app code is correct.
+- The Playwright E2E suite drives a real login through Auth0's hosted Universal Login and lets the browser hit AniList's real GraphQL API. Nothing is mocked, so a slow AniList response can fail the suite even when the app code is correct.
 
 ## Deployment
 

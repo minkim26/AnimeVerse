@@ -1,10 +1,7 @@
 import { test, expect } from '@playwright/test'
+import { loginViaAuth0, ensureOnboarded, requiredEnv } from './auth0-login.ts'
 
-function uniqueEmail(): string {
-  return `e2e-console-${Date.now()}-${Math.floor(Math.random() * 10000)}@example.com`
-}
-
-test('no console or page errors during the primary signup-to-profile flow', async ({ page }) => {
+test('no console or page errors during the primary login-to-profile flow', async ({ page }) => {
   const errors: string[] = []
   let filteredCount = 0
   page.on('console', (msg) => {
@@ -27,32 +24,9 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
     errors.push(`pageerror: ${err.message}`)
   })
 
-  const email = uniqueEmail()
-  const password = 'correct horse battery staple'
-
   await page.goto('/')
-  await page.goto('/signup')
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
-  await page.getByRole('button', { name: 'Sign Up' }).click()
-
-  await page.waitForURL('**/login')
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
-  await page.getByRole('button', { name: 'Login' }).click()
-
-  await page.waitForURL('**/profile')
-  await page.goto('/explore')
-  await page.waitForURL('**/discover')
-  await page.getByRole('button', { name: 'Like' }).click()
-  // Wait for the swipe POST to actually finish (Discover.tsx's role="status"
-  // region) before navigating away — page.goto() is a full navigation that
-  // tears down the SPA and aborts whatever fetch is still in flight, which
-  // would otherwise manufacture a spurious "[Discover] Failed to record
-  // swipe" error on every run instead of only under real network failure.
-  await page.getByText('Saved').waitFor()
-
-  await page.goto('/explore')
+  await loginViaAuth0(page, requiredEnv('E2E_AUTH0_TEST_EMAIL'), requiredEnv('E2E_AUTH0_TEST_PASSWORD'))
+  await ensureOnboarded(page)
   await expect(page.getByRole('heading', { name: 'Explore', exact: true })).toBeVisible()
   // Same reasoning: let the four sections' AniList/preferences fetches
   // settle (success or error) before navigating on, instead of racing them.
@@ -74,7 +48,9 @@ test('no console or page errors during the primary signup-to-profile flow', asyn
   // affordance since the SPA rewrite) — scope to <main> so the locator
   // isn't ambiguous between the two.
   await page.getByRole('main').getByRole('button', { name: 'Logout' }).click()
-  await page.waitForURL('**/login')
+  // Auth0's logout() redirects to window.location.origin (the app root),
+  // not /login — unlike the deleted direct-login flow this test used to drive.
+  await page.waitForURL((url) => url.pathname === '/')
 
   // Surfaced (not asserted on) so a CI log or local run shows at a glance
   // whether the filter above is still a rare safety net or is quietly

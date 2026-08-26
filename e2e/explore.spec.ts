@@ -1,31 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { loginViaAuth0, ensureOnboarded, requiredEnv } from './auth0-login.ts'
 
 test('login then Explore page renders For You and Browse & Search', async ({ page }) => {
-  const email = process.env.E2E_AUTH0_TEST_EMAIL
-  const password = process.env.E2E_AUTH0_TEST_PASSWORD
-  if (!email || !password) {
-    throw new Error('E2E_AUTH0_TEST_EMAIL and E2E_AUTH0_TEST_PASSWORD must be set')
-  }
-
-  await page.goto('/login')
-  await page.getByRole('button', { name: 'Log In' }).click()
-
-  // Cross-origin navigation to Auth0's hosted Universal Login page.
-  // These are Auth0's documented New Universal Login field names; if this
-  // step fails, inspect the actual rendered page (Auth0 occasionally
-  // changes markup between login-experience versions) and adjust the
-  // selectors below.
-  await page.waitForURL(/\.auth0\.com\/u\/login/)
-  await page.locator('input[name="username"]').fill(email)
-  await page.locator('input[name="password"]').fill(password)
-  await page.locator('button[type="submit"]').click()
-
-  await page.waitForURL('**/profile')
-  await page.goto('/explore')
-  await page.waitForURL('**/discover')
-  await page.getByRole('button', { name: 'Like' }).click()
-
-  await page.goto('/explore')
+  await loginViaAuth0(page, requiredEnv('E2E_AUTH0_TEST_EMAIL'), requiredEnv('E2E_AUTH0_TEST_PASSWORD'))
+  await ensureOnboarded(page)
 
   await expect(page.getByRole('heading', { name: 'Explore', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'For You' })).toBeVisible()

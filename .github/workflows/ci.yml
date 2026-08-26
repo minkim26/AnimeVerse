@@ -133,6 +133,8 @@ jobs:
       VITE_AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
       E2E_AUTH0_TEST_EMAIL: ${{ secrets.E2E_AUTH0_TEST_EMAIL }}
       E2E_AUTH0_TEST_PASSWORD: ${{ secrets.E2E_AUTH0_TEST_PASSWORD }}
+      E2E_AUTH0_ONBOARDING_TEST_EMAIL: ${{ secrets.E2E_AUTH0_ONBOARDING_TEST_EMAIL }}
+      E2E_AUTH0_ONBOARDING_TEST_PASSWORD: ${{ secrets.E2E_AUTH0_ONBOARDING_TEST_PASSWORD }}
       # Must match the port Playwright boots the frontend dev server on
       # (playwright.config.ts webServer) — server.ts's cors() rejects
       # any other origin.

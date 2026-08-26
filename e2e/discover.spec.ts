@@ -1,24 +1,21 @@
 import { test, expect } from '@playwright/test'
+import { loginViaAuth0, requiredEnv } from './auth0-login.ts'
 
-function uniqueEmail(): string {
-  return `e2e-${Date.now()}-${Math.floor(Math.random() * 10000)}@example.com`
-}
-
-test('a new user is redirected to Discover before reaching Recommendations, and swiping unlocks it', async ({ page }) => {
-  const email = uniqueEmail()
-  const password = 'correct horse battery staple'
-
-  await page.goto('/signup')
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
-  await page.getByRole('button', { name: 'Sign Up' }).click()
-
-  await page.waitForURL('**/login')
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(password)
-  await page.getByRole('button', { name: 'Login' }).click()
-
-  await page.waitForURL('**/profile')
+// Uses its own dedicated Auth0 identity (E2E_AUTH0_ONBOARDING_TEST_EMAIL/
+// PASSWORD) rather than the E2E_AUTH0_TEST_EMAIL one explore.spec.ts and
+// console-errors.spec.ts share. Postgres is a fresh per-run service
+// container (see ci.yml), so this identity's User row has zero Swipe rows
+// at the start of every CI run — but only if no other spec ever swipes for
+// it. Keeping it exclusive to this test is what makes the "redirected
+// before swiping" assertion below deterministic instead of order-dependent.
+test('a new user is redirected to Discover before reaching Recommendations, and swiping unlocks it', async ({
+  page,
+}) => {
+  await loginViaAuth0(
+    page,
+    requiredEnv('E2E_AUTH0_ONBOARDING_TEST_EMAIL'),
+    requiredEnv('E2E_AUTH0_ONBOARDING_TEST_PASSWORD'),
+  )
   await page.goto('/explore')
   await expect(page).toHaveURL(/\/discover$/)
 

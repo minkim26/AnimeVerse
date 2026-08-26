@@ -6,9 +6,9 @@ import type { Request, Response, NextFunction } from 'express'
  * cron workflow, not a logged-in user — see docs/superpowers/specs/
  * 2026-08-23-anime-cache-verification-worker-design.md for why a shared
  * secret is the right-sized auth here instead of a user role. Fails loud
- * at import time, same convention as lib/auth.ts's JWT_SECRET check —
- * including the length floor, so the .env.example placeholder value can't
- * accidentally end up guarding this endpoint in a real deployment.
+ * at import time with a length floor, so the .env.example placeholder
+ * value can't accidentally end up guarding this endpoint in a real
+ * deployment.
  */
 const MIN_ADMIN_CRON_SECRET_LENGTH = 32
 function requireCronSecretEnv(): string {

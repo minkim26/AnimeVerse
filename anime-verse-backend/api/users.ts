@@ -1,140 +1,74 @@
 import { Router } from 'express'
-import bcrypt from 'bcryptjs'
 
 import prisma from '../lib/prisma.ts'
-import { User, UpdatePassword } from '../lib/zod.ts'
-import { generateToken, requireAuth, revokeTokensIssuedBefore, type AuthenticatedRequest } from '../lib/auth.ts'
-import { getJSON, setJSON, invalidate, userCacheKey, withoutPassword, USER_CACHE_TTL_SECONDS } from '../lib/cache.ts'
-import { authLimiter } from '../lib/rateLimit.ts'
+import { checkJwt, requireAuth, EMAIL_CLAIM, EMAIL_VERIFIED_CLAIM, type AuthenticatedRequest } from '../lib/auth.ts'
+import { getJSON, setJSON, userCacheKey, withoutAuth0Id, USER_CACHE_TTL_SECONDS } from '../lib/cache.ts'
 
 const router = Router()
 
-const BCRYPT_COST_FACTOR = 10
-
 /*
- * POST /users — Register a new user.
- *
- * Password storage: bcrypt.hash() generates a random salt, mixes it with
- * the password, and runs a slow hashing algorithm. The salt is embedded in
- * the resulting hash string, so bcrypt.compare() can verify a password
- * later without storing the salt separately.
- *
- * Returns: 201 { id } on success
+ * POST /users/sync — called once by the frontend right after Auth0 login.
+ * Resolves the caller's Auth0 identity to a local User row: reuses one
+ * already linked to this auth0Id, links a pre-migration row with the same
+ * email (see docs/superpowers/plans/2026-08-26-auth0-migration.md's
+ * Migration Sequencing), or creates a fresh one.
  */
 /**
  * @openapi
- * /users:
+ * /users/sync:
  *   post:
  *     tags: [Users]
- *     summary: Register a new user
- *     description: Rate limited to 10 requests / 15 min / IP.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email, password]
- *             properties:
- *               email: { type: string, format: email }
- *               password: { type: string, minLength: 8 }
- *     responses:
- *       201:
- *         description: Created
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id: { type: integer }
- *       400:
- *         description: Invalid body, or the email is already registered (same generic message either way)
- *       429:
- *         description: Rate limit exceeded
- */
-router.post('/', authLimiter, async (req, res) => {
-    const data = User.parse(req.body)
-
-    // No pre-check for an existing email: that would return a distinct
-    // response for "already registered" vs. any other failure, letting an
-    // attacker enumerate which emails have accounts. The @unique constraint
-    // on User.email does the work instead; app.ts's error handler turns the
-    // resulting P2002 into the same generic 400 as any other failure here.
-    const hashedPassword = await bcrypt.hash(data.password, BCRYPT_COST_FACTOR)
-
-    const user = await prisma.user.create({
-        data: { email: data.email, password: hashedPassword }
-    })
-
-    res.status(201).send({ id: user.id })
-})
-
-/*
- * POST /users/login — Authenticate a user and return a JWT.
- *
- * We return the same 401 whether the email doesn't exist, the password is
- * wrong, or the request body fails validation (e.g. a password under 8
- * characters) — this avoids leaking which emails are registered, and also
- * avoids leaking *why* a login attempt failed. Unlike signup, where format
- * feedback ("password must be at least 8 characters") is helpful and safe
- * to show, on login it's a distinguishing signal an attacker could use to
- * tell malformed input apart from a merely-wrong password. safeParse (not
- * User.parse) is deliberate: a thrown ZodError would bubble to app.ts's
- * error handler as a 400 with format-specific detail, defeating this.
- *
- * Returns: 200 { token } on success, 401 on any other outcome
- */
-/**
- * @openapi
- * /users/login:
- *   post:
- *     tags: [Users]
- *     summary: Log in and receive a JWT
- *     description: Rate limited to 10 requests / 15 min / IP. Returns 401 for a bad password, an unknown email, or a malformed body alike, so a failure never reveals which case it was.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email, password]
- *             properties:
- *               email: { type: string, format: email }
- *               password: { type: string }
+ *     summary: Provision or resolve the local User row for the authenticated Auth0 identity
+ *     description: Idempotent. Must be called once after every login before any other authenticated route, since those 404 for an identity that hasn't synced yet.
+ *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200:
- *         description: OK
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 token: { type: string, description: 'JWT, valid 24h' }
+ *         description: Existing or newly-linked user
+ *       201:
+ *         description: Newly created user
+ *       400:
+ *         description: The Auth0 token is missing the email claim (see the Post-Login Action in Auth0's dashboard)
  *       401:
- *         description: Invalid credentials
- *       429:
- *         description: Rate limit exceeded
+ *         description: Missing or invalid token
  */
-router.post('/login', authLimiter, async (req, res) => {
-    const result = User.safeParse(req.body)
-    if (!result.success) {
-        return res.status(401).send({ error: 'Invalid credentials' })
-    }
-    const { email, password } = result.data
+router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
+    const sub = req.auth!.payload.sub as string
+    const email = req.auth!.payload[EMAIL_CLAIM] as string | undefined
+    const emailVerified = req.auth!.payload[EMAIL_VERIFIED_CLAIM] as boolean | undefined
 
-    const user = await prisma.user.findUnique({ where: { email } })
-
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-        return res.status(401).send({ error: 'Invalid credentials' })
+    if (!email) {
+        return res.status(400).send({ error: 'Auth0 token is missing the email claim' })
     }
 
-    res.status(200).send({ token: generateToken(user.id) })
+    const existing = await prisma.user.findUnique({ where: { auth0Id: sub } })
+    if (existing) {
+        return res.status(200).send(withoutAuth0Id(existing))
+    }
+
+    // Bridges a pre-migration row imported from the old system: such a row
+    // has this email and auth0Id still NULL. Only a row created by the
+    // bulk import can match here — every row created after cutover always
+    // has auth0Id set at creation (see the create() call below) — so this
+    // can only ever link an imported account, never hijack a normal
+    // signup. Gated on emailVerified so an attacker can't race the real
+    // owner by registering an unverified Auth0 identity with the owner's
+    // email.
+    if (emailVerified) {
+        const linked = await prisma.user.updateMany({ where: { email, auth0Id: null }, data: { auth0Id: sub } })
+        if (linked.count > 0) {
+            const user = await prisma.user.findUniqueOrThrow({ where: { auth0Id: sub } })
+            return res.status(200).send(withoutAuth0Id(user))
+        }
+    }
+
+    const user = await prisma.user.create({ data: { auth0Id: sub, email } })
+    res.status(201).send(withoutAuth0Id(user))
 })
 
 /*
- * GET /users/me — Fetch the authenticated user's profile (excluding
- * their password hash). Cached in Redis — invalidated by any endpoint that
- * changes a field this response includes (avatar upload, password change).
+ * GET /users/me — Fetch the authenticated user's profile. Cached in
+ * Redis — invalidated by any endpoint that changes a field this response
+ * includes (avatar upload).
  */
 /**
  * @openapi
@@ -173,64 +107,9 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
         return res.status(404).send({ error: 'User not found' })
     }
 
-    const sanitized = withoutPassword(user)
+    const sanitized = withoutAuth0Id(user)
     await setJSON(cacheKey, sanitized, USER_CACHE_TTL_SECONDS)
     res.status(200).send(sanitized)
-})
-
-/*
- * PATCH /users/me/password — Update the authenticated user's password.
- *
- * The caller must supply their current password; we re-verify it with
- * bcrypt.compare() before allowing the change (same behavior the old
- * server.js already had for /api/updatePassword).
- */
-/**
- * @openapi
- * /users/me/password:
- *   patch:
- *     tags: [Users]
- *     summary: Change the authenticated user's password
- *     description: Revokes every JWT issued before this change, so other logged-in sessions are signed out.
- *     security: [{ bearerAuth: [] }]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [oldPassword, newPassword]
- *             properties:
- *               oldPassword: { type: string }
- *               newPassword: { type: string, minLength: 8 }
- *     responses:
- *       204:
- *         description: Password updated
- *       400:
- *         description: oldPassword is incorrect
- *       401:
- *         description: Missing or invalid token
- *       404:
- *         description: User not found
- */
-router.patch('/me/password', requireAuth, async (req: AuthenticatedRequest, res) => {
-    const data = UpdatePassword.parse(req.body)
-
-    const user = await prisma.user.findUnique({ where: { id: req.user!.id } })
-    if (!user) {
-        return res.status(404).send({ error: 'User not found' })
-    }
-
-    if (!(await bcrypt.compare(data.oldPassword, user.password))) {
-        return res.status(400).send({ error: 'Old password is incorrect' })
-    }
-
-    const hashedNewPassword = await bcrypt.hash(data.newPassword, BCRYPT_COST_FACTOR)
-    await prisma.user.update({ where: { id: user.id }, data: { password: hashedNewPassword } })
-    await invalidate(userCacheKey(user.id))
-    await revokeTokensIssuedBefore(user.id)
-
-    res.status(204).send()
 })
 
 export default router

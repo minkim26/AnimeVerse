@@ -25,19 +25,6 @@ function perUserKey(req: Request): string {
 }
 
 /*
- * authLimiter — caps signup/login attempts per IP. Directly targets
- * credential-stuffing/brute-force attempts against POST /users and
- * POST /users/login.
- */
-export const authLimiter = rateLimit({
-    windowMs: 15 * MINUTE,
-    limit: 10,
-    standardHeaders: true,
-    legacyHeaders: false,
-    store: makeStore('rl:auth:')
-})
-
-/*
  * uploadLimiter — caps avatar uploads per authenticated user (falls back to
  * IP if, somehow, req.user isn't set yet). Runs after requireAuth in the
  * route chain.

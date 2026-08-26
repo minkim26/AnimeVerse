@@ -17,9 +17,10 @@ const app = express()
 
 // Production runs behind Cloudflare's tunnel/edge (see compose.prod.yml's
 // cloudflared service). Without this, req.ip is the tunnel's own container
-// address for every request, so IP-keyed rate limiting (authLimiter in
-// lib/rateLimit.ts) would share one budget across all users instead of
-// limiting each client separately.
+// address for every request, so IP-keyed rate limiting (the fallback
+// perUserKey uses in lib/rateLimit.ts when req.user isn't set yet) would
+// share one budget across all users instead of limiting each client
+// separately.
 app.set('trust proxy', 1)
 
 app.use(morgan('dev'))

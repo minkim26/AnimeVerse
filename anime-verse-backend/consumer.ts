@@ -5,7 +5,7 @@ import http from 'http'
 
 import prisma from './lib/prisma.ts'
 import supabase from './lib/supabase.ts'
-import { setJSON, userCacheKey, withoutPassword, USER_CACHE_TTL_SECONDS } from './lib/cache.ts'
+import { setJSON, userCacheKey, withoutAuth0Id, USER_CACHE_TTL_SECONDS } from './lib/cache.ts'
 import { AVATAR_QUEUE, setupAvatarQueue, ANIME_REFRESH_QUEUE, setupAnimeRefreshQueue } from './lib/queue.ts'
 import { fetchAnimeById } from './lib/anilistServer.ts'
 import { verifyAnime } from './lib/animeCache.ts'
@@ -56,7 +56,7 @@ export async function processThumbnailMessage({ userId, filename }: ThumbnailMes
     // frontend polls this exact route while showing "Generating
     // thumbnail...") can otherwise read-and-cache the pre-thumbnail row
     // after this invalidation fires, serving stale data for the full TTL.
-    await setJSON(userCacheKey(userId), withoutPassword(updatedUser), USER_CACHE_TTL_SECONDS)
+    await setJSON(userCacheKey(userId), withoutAuth0Id(updatedUser), USER_CACHE_TTL_SECONDS)
 
     console.log(`Thumbnail generated for user ${userId}`)
 }

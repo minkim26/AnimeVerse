@@ -112,7 +112,7 @@ describe('processThumbnailMessage', () => {
         expect(cached).not.toBeNull()
         const parsed = JSON.parse(cached!)
         expect(parsed.avatarThumbnailUrl).toBe('http://fake.test/avatar.png')
-        expect(parsed.password).toBeUndefined()
+        expect(parsed.auth0Id).toBeUndefined()
 
         await user.cleanup()
     })

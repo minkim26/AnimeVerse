@@ -56,7 +56,7 @@ No em dashes, no conventional-commit prefixes, no AI attribution, no emoji.
 
 ## UI Change Workflow
 
-When you change anything in `src/pages/` or `src/components/` that affects layout, use the `ui-change-workflow` skill to regenerate and verify Playwright visual-regression baselines before committing.
+When you change anything in `src/pages/` or `src/components/` that affects layout, run `npm run test:e2e:update` before committing, look at the regenerated screenshots under `e2e/visual.spec.ts-snapshots/` to confirm the new layout is correct, then commit the updated `-darwin` baselines alongside the code change. This only refreshes the local macOS baselines; the CI-side `-linux` ones are regenerated separately and automatically by `update-e2e-snapshots.yml` once the change lands on `main`.
 
 ## Common Commands
 

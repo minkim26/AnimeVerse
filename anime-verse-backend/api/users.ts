@@ -34,7 +34,7 @@ const router = Router()
 router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
     const sub = req.auth!.payload.sub as string
     const email = req.auth!.payload[EMAIL_CLAIM] as string | undefined
-    const emailVerified = req.auth!.payload[EMAIL_VERIFIED_CLAIM] as boolean | undefined
+    const emailVerified = req.auth!.payload[EMAIL_VERIFIED_CLAIM]
 
     if (!email) {
         return res.status(400).send({ error: 'Auth0 token is missing the email claim' })
@@ -53,7 +53,7 @@ router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
     // signup. Gated on emailVerified so an attacker can't race the real
     // owner by registering an unverified Auth0 identity with the owner's
     // email.
-    if (emailVerified) {
+    if (emailVerified === true) {
         const linked = await prisma.user.updateMany({ where: { email, auth0Id: null }, data: { auth0Id: sub } })
         if (linked.count > 0) {
             const user = await prisma.user.findUniqueOrThrow({ where: { auth0Id: sub } })

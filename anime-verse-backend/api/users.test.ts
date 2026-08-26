@@ -88,6 +88,64 @@ describe('POST /users/sync', () => {
         const res = await request(app).post('/users/sync')
         expect(res.status).toBe(401)
     })
+
+    it('rejects a token signed with the wrong secret', async () => {
+        const token = jwt.sign(
+            { [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true },
+            'a-completely-different-secret',
+            {
+                subject: 'test|wrong-signature',
+                algorithm: 'HS256',
+                issuer: process.env.ISSUER_BASE_URL,
+                audience: process.env.AUDIENCE,
+                expiresIn: '1h'
+            }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(401)
+    })
+
+    it('rejects a token with the wrong audience', async () => {
+        const token = signToken(
+            { [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true },
+            { subject: 'test|wrong-audience', audience: 'https://not-the-right-audience' }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(401)
+    })
+
+    it('rejects a token with the wrong issuer', async () => {
+        const token = signToken(
+            { [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true },
+            { subject: 'test|wrong-issuer', issuer: 'https://not-the-right-issuer.example.com/' }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(401)
+    })
+
+    it('rejects an expired token', async () => {
+        // A negative expiresIn produces an exp already in the past, without
+        // setting payload.exp directly alongside it — jsonwebtoken's sign()
+        // throws if both options.expiresIn and payload.exp are present
+        // (confirmed empirically), and signToken's default options always
+        // carry an expiresIn key, so overriding it here (rather than adding
+        // a separate exp claim) is what actually keeps this a single,
+        // unambiguous expiration source.
+        const token = signToken(
+            { [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true },
+            { subject: 'test|expired', expiresIn: -3600 }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(401)
+    })
 })
 
 describe('GET /users/me', () => {
@@ -105,5 +163,13 @@ describe('GET /users/me', () => {
     it('requires authentication', async () => {
         const res = await request(app).get('/users/me')
         expect(res.status).toBe(401)
+    })
+
+    it('returns 404 for a validly-signed token whose subject never called /users/sync', async () => {
+        const token = signToken({ [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true }, { subject: 'test|never-synced' })
+
+        const res = await request(app).get('/users/me').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(404)
     })
 })

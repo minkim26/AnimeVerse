@@ -34,6 +34,13 @@ function Auth0ProviderWithNavigate({ children }: { children: React.ReactNode }) 
   )
 }
 
+const requiredAuth0Env = ['VITE_AUTH0_DOMAIN', 'VITE_AUTH0_CLIENT_ID', 'VITE_AUTH0_AUDIENCE'] as const
+for (const key of requiredAuth0Env) {
+  if (!import.meta.env[key]) {
+    throw new Error(`${key} is not defined in env variables`)
+  }
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

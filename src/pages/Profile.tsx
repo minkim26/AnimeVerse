@@ -247,7 +247,7 @@ function RandomAnimeGenerator() {
 export default function Profile() {
   usePageMeta({
     title: 'Profile',
-    description: "Manage your AnimeVerse account, avatar, and password, and revisit anime you've swiped on.",
+    description: "Manage your AnimeVerse account and avatar, and revisit anime you've swiped on.",
   })
   const [user, setUser] = useState<User | null>(null)
   const { logout } = useAuth0()

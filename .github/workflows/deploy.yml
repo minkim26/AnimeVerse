@@ -8,6 +8,7 @@ on:
 
 permissions:
   deployments: write
+  checks: read
 
 jobs:
   deploy:
@@ -59,3 +60,47 @@ jobs:
           token: '${{ github.token }}'
           state: failure
           deployment-id: ${{ steps.deployment.outputs.deployment_id }}
+
+      # The frontend deploys separately, through Cloudflare's own GitHub
+      # integration (not this workflow), which reports as the "Workers
+      # Builds: animeverse" check run on this commit rather than through the
+      # Deployments API. Independent of the backend deploy above, so this
+      # runs regardless of whether that succeeded or failed - poll that
+      # check run for its real conclusion instead of assuming success just
+      # because this workflow is running.
+      - name: Track frontend deployment (Cloudflare Workers)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          REPO="${{ github.repository }}"
+
+          DEPLOYMENT_ID=$(gh api "repos/$REPO/deployments" \
+            -f ref="$SHA" \
+            -f environment=production-frontend \
+            -f description="Cloudflare Workers frontend" \
+            -F auto_merge=false \
+            --jq .id)
+
+          CONCLUSION=""
+          for i in $(seq 1 30); do
+            RUN=$(gh api "repos/$REPO/commits/$SHA/check-runs" \
+              --jq '.check_runs[] | select(.name == "Workers Builds: animeverse")')
+            STATUS=$(echo "$RUN" | jq -r '.status // empty')
+            CONCLUSION=$(echo "$RUN" | jq -r '.conclusion // empty')
+            if [ "$STATUS" = "completed" ]; then
+              break
+            fi
+            sleep 10
+          done
+
+          if [ "$CONCLUSION" = "success" ]; then
+            STATE=success
+          else
+            STATE=failure
+          fi
+
+          gh api "repos/$REPO/deployments/$DEPLOYMENT_ID/statuses" \
+            -f state="$STATE" \
+            -f environment_url="https://animeverse.minkim26.tech"

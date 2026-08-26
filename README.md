@@ -206,7 +206,7 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 
 ## Continuous Integration
 
-`.github/workflows/ci.yml` runs on every push/PR to `main`, in three jobs: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against service containers, then runs the Playwright suite from the root package). None of the jobs deploy anywhere; backend deploys are currently manual (see [Deployment](#deployment)).
+`.github/workflows/ci.yml` runs on every push/PR to `main`, in three jobs: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against service containers, then runs the Playwright suite from the root package). None of these jobs deploy anywhere themselves; `deploy.yml` runs separately once `ci.yml` succeeds on `main` (see [Deployment](#deployment)).
 
 A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_dispatch`-only (manual trigger, never runs on push/PR) and regenerates the Linux visual-regression baselines in `e2e/visual.spec.ts-snapshots/`, then opens a PR with the result. See `CLAUDE.md`'s "UI Change Workflow" section for when to run it.
 
@@ -223,8 +223,8 @@ The frontend deploys to Cloudflare Workers (static assets) from `main`, live at 
 
 The backend runs on an LXC container on a home-lab Proxmox host, through `anime-verse-backend/compose.prod.yml`: `api`, `consumer`, `rabbitmq`, `redis`, and `cloudflared` in Docker Compose. `cloudflared` opens an outbound-only Cloudflare Tunnel, so the box has no public IP and no inbound ports at all; Cloudflare's edge terminates TLS and proxies `https://api.minkim26.tech` straight to it. Postgres runs on Supabase rather than self-hosted, connected through its session pooler.
 
-This setup has no ongoing hosting cost — no VM, no reserved IP, nothing billed. A previous iteration ran on a GCP `e2-micro` VM (`https://animeverse-app.duckdns.org`), which did carry a real ~$3.65/month charge for its external IP; that VM is being decommissioned now that the Proxmox setup is verified.
+This setup has no ongoing hosting cost: no VM, no reserved IP, nothing billed. A previous iteration ran on a GCP `e2-micro` VM (`https://animeverse-app.duckdns.org`), which did carry a real ~$3.65/month charge for its external IP; that VM is being decommissioned now that the Proxmox setup is verified.
 
 Backend deploys are automatic: `.github/workflows/deploy.yml` triggers on a successful `CI` run against `main`, joins the home-lab's Tailscale network (the deploy target has no public IP either), and runs `git pull && docker compose -f compose.prod.yml up -d --build` over SSH.
 
-The full provisioning steps and the reasoning behind each choice — including the original GCP-based design and the cost analysis that motivated the move off it — live in `docs/superpowers/specs/2026-08-24-production-deployment-design.md` and `docs/superpowers/plans/2026-08-24-production-deployment.md`.
+`docs/superpowers/specs/2026-08-24-production-deployment-design.md` and `docs/superpowers/plans/2026-08-24-production-deployment.md` cover the original GCP-based deployment: its provisioning steps, the reasoning behind each choice, and the cost analysis that motivated the move off it. Neither document describes the current Proxmox/Cloudflare Tunnel setup.

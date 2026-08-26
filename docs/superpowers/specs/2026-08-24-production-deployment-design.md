@@ -1,6 +1,6 @@
 # Production Deployment
 
-> **Superseded.** This document describes the original GCP + DuckDNS + Caddy design and the ~$3.65/month cost gap it shipped with. The backend was later moved to a home-lab Proxmox LXC reached through a Cloudflare Tunnel, which actually reaches the $0/month goal below and needs no public IP at all. See CLAUDE.md's Known Quirks and README.md's Deployment section for the current, accurate picture. This document is kept for the reasoning behind the original choices (Oracle/GCP trade-offs, DuckDNS, the cost analysis) — the goals and cost figures below reflect that design, not the current one.
+> **Superseded.** This document describes the original GCP + DuckDNS + Caddy design and the ~$3.65/month cost gap it shipped with. The backend was later moved to a home-lab Proxmox LXC reached through a Cloudflare Tunnel, which actually reaches the $0/month goal below and needs no public IP at all. See CLAUDE.md's Known Quirks and README.md's Deployment section for the current, accurate picture. This document is kept for the reasoning behind the original choices (Oracle/GCP trade-offs, DuckDNS, and the cost analysis); the goals and cost figures below reflect that design, not the current one.
 
 ## Overview
 

@@ -1402,10 +1402,15 @@ git commit -m "Add a script to export existing users for Auth0 bulk import"
 
 - [ ] **Step 4 (MANUAL, production, only with explicit sign-off — not part of this coding session's automated work):**
 
-Follow the spec's Migration Sequencing section in order:
-1. Run this script against production Postgres, before Task 2's migration touches production.
+**Two sequencing hazards, found by this branch's final whole-branch review, that make this section more than just "run these commands in order" — read both before starting:**
+
+- **`npx prisma migrate deploy` is not actually a separate manual step you control.** `compose.prod.yml`'s `migrate` service runs it automatically, unconditionally, every time `deploy.yml` deploys the backend — and `deploy.yml` fires automatically the moment CI goes green on a push to `main`. There is no manual moment to gate on: steps 1-3 below (export, import, delete the local file) must be fully complete *before this branch is merged to `main` at all*, once Task 1's real Auth0 secrets exist and CI can actually pass. Merging first and running the export "before you get around to deploying" does not work with this pipeline — CI going green and the migration applying happen together, unattended.
+- **The frontend and backend deploy through independently triggered pipelines, and only one of them is gated on the other.** `deploy.yml`'s backend deploy waits for the `CI` workflow to succeed. The frontend does not go through that workflow at all — Cloudflare Workers Builds deploys straight from a push to `main` via its own GitHub integration, with no dependency on this repo's CI. If this branch merges to `main` while CI is red (which it will be until Task 1's secrets are added — the `e2e` job's backend can't boot without them), Cloudflare still ships the new Auth0 frontend immediately, while the backend deploy is skipped and `api.minkim26.tech` keeps serving the old self-issued-JWT backend against the old schema. Every authenticated request on the live site 401s until the backend deploy catches up. **Before merging this branch to `main`, pause or temporarily disconnect Cloudflare's automatic build for the frontend Workers project** (Cloudflare dashboard → the Workers project → Settings → Builds), and only re-enable it once the backend has actually deployed successfully with the real Auth0 secrets in place.
+
+With both of those accounted for, follow the spec's Migration Sequencing section in order:
+1. Run this script against production Postgres, before Task 2's migration touches production, and before this branch merges to `main` (see above).
 2. Import the resulting JSON via the Auth0 Dashboard (Authentication → Database → your connection → Users → Import Users) or `auth0 api post "jobs/users-imports" --data "connection_id=<id>" --data "users=@users-import.json"`.
 3. Delete the local export file — it contains bcrypt hashes.
-4. Only then run `npx prisma migrate deploy` against production.
-5. Deploy the new backend and frontend together (this plan's Tasks 2-6, merged to `main`).
-6. Update production secrets: backend gets real `ISSUER_BASE_URL`/`AUDIENCE` (no `AUTH0_TEST_SIGNING_SECRET`); frontend's Cloudflare Workers build env gets real `VITE_AUTH0_DOMAIN`/`VITE_AUTH0_CLIENT_ID`/`VITE_AUTH0_AUDIENCE`.
+4. Pause Cloudflare's automatic frontend build (see above), then complete Task 1 if not already done, and add its real secrets as GitHub repo secrets (Tasks 5 and 6 already reference them) plus production's `ISSUER_BASE_URL`/`AUDIENCE` (no `AUTH0_TEST_SIGNING_SECRET`) and Cloudflare's build-env `VITE_AUTH0_DOMAIN`/`VITE_AUTH0_CLIENT_ID`/`VITE_AUTH0_AUDIENCE`.
+5. Merge this branch (Tasks 2-7) to `main`. Once CI is green, `deploy.yml` auto-deploys the backend, which is what actually runs `prisma migrate deploy` against production — this is the moment the migration applies, not a separate manual command.
+6. Confirm the backend deploy succeeded and the new schema is live, then re-enable Cloudflare's automatic frontend build so it picks up the merge and deploys the new frontend.

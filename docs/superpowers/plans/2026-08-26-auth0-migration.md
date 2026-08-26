@@ -12,7 +12,7 @@
 1. **Env var names**: the spec says `AUTH0_ISSUER_BASE_URL`; this plan uses `ISSUER_BASE_URL` (no prefix) because that's the literal name `express-oauth2-jwt-bearer` auto-reads from the environment — `AUTH0_ISSUER_BASE_URL` would silently never be read.
 2. **`jsonwebtoken` stays as a devDependency**, not fully removed — it mints test-only HS256 tokens (see Task 2's testing strategy). No production code imports it.
 3. **A stripped-response helper survives**, renamed from `withoutPassword` to `withoutAuth0Id` — `auth0Id` isn't secret, but it's an internal identity detail the API's response shape shouldn't leak, matching the spec's own instinct even though the spec said to delete the helper outright.
-4. **Route tests use an HS256 shared-secret bypass, not module-mocking.** The spec's Testing Approach suggested mocking `express-oauth2-jwt-bearer`'s `auth()` at the module level. This plan instead makes `checkJwt`'s signing algorithm swap to HS256 when `AUTH0_TEST_SIGNING_SECRET` is set (a first-class config option the library already supports), so tests exercise the exact same verification code path production does — just with a different key — instead of a hand-rolled mock standing in for it. See Task 2, Step 5.
+4. **Route tests use an HS256 shared-secret bypass, not module-mocking.** The spec's Testing Approach suggested mocking `express-oauth2-jwt-bearer`'s `auth()` at the module level. This plan instead makes `checkJwt`'s signing algorithm swap to HS256 when `AUTH0_TEST_SIGNING_SECRET` is set (a first-class config option the library already supports), so tests exercise the exact same verification code path production does — just with a different key — instead of a hand-rolled mock standing in for it. See Task 2, Step 5. The HS256 branch passes `issuer`/`audience` explicitly rather than falling through to `auth()`'s own `ISSUER_BASE_URL`/`AUDIENCE` env-var auto-detection: the library runs real OIDC discovery (a network fetch) whenever `issuerBaseURL` is set, regardless of whether `secret` is also set, and only skips it when configured with `issuer` instead. Confirmed against the installed library's source and with a standalone spike before writing Task 2's steps — this is what makes the whole test suite runnable offline.
 
 ## Global Constraints
 
@@ -43,11 +43,11 @@
 **Interfaces:**
 - Produces: real values for `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUDIENCE` (the API identifier), plus a working Post-Login Action — every later task's real (non-test) configuration depends on these.
 
-This can't be done by an agent — it requires clicking through the Auth0 dashboard (or the `auth0` CLI, if you have it installed and are logged in). Do this whenever convenient; Tasks 2-5 don't need it (they run against the `AUTH0_TEST_SIGNING_SECRET` bypass). Tasks 6 and 7 do need it.
+This can't be done by an agent — it requires clicking through the Auth0 dashboard (or the `auth0` CLI, if you have it installed and are logged in). Do this whenever convenient; Tasks 2-4 don't need it (their tests run against the `AUTH0_TEST_SIGNING_SECRET` bypass). Task 5's `backend`-job change doesn't either, but its `e2e`-job change does, since that job's backend validates real Auth0-issued tokens — as do Tasks 6 and 7.
 
 - [ ] **Step 1: Create the tenant and SPA application**
 
-Sign up / log in at https://manage.auth0.com. Create an application: **Applications → Create Application → Single Page Web Applications**. Note its **Domain** and **Client ID** — these become `VITE_AUTH0_DOMAIN` / `VITE_AUTH0_CLIENT_ID`.
+Sign up / log in at https://manage.auth0.com. Create an application: **Applications → Create Application → Single Page Web Applications**. Note its **Domain** and **Client ID** — these become `VITE_AUTH0_DOMAIN` / `VITE_AUTH0_CLIENT_ID`. In the application's **Settings → Advanced Settings → Grant Types**, confirm **Refresh Token** is checked — Task 3 requests `offline_access` and sets `useRefreshTokens`, and Auth0 only issues a refresh token to an application whose grant types allow it.
 
 - [ ] **Step 2: Create the API (Resource Server)**
 
@@ -78,9 +78,9 @@ exports.onExecutePostLogin = async (event, api) => {
 
 Deploy it, then **Actions → Flows → Login**, drag it into the flow, and hit Apply. Without this, `POST /users/sync` (Task 2) 400s on every login — the access token the backend sees carries no profile claims otherwise.
 
-- [ ] **Step 6: Record the values**
+- [ ] **Step 6: Record the values and add them as GitHub Actions secrets**
 
-Write down `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUDIENCE` somewhere you can paste from later (Tasks 6 and 7 need them; don't commit them anywhere).
+Write down `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUDIENCE` somewhere you can paste from later (don't commit them anywhere). Task 7 needs them for the production deploy. Task 5's `e2e` job also needs them as repo secrets, since that job drives a real Auth0 login: in `Settings → Secrets and variables → Actions`, add `AUTH0_ISSUER_BASE_URL` (the Domain from Step 1, as a full `https://` URL), `AUTH0_DOMAIN` (the same Domain, bare), `AUTH0_CLIENT_ID`, and `AUTH0_AUDIENCE` (the Identifier from Step 2).
 
 ---
 
@@ -102,7 +102,7 @@ Write down `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUDIENCE` somewhere you can paste
 - Modify: `anime-verse-backend/lib/swagger.ts` (update the `bearerAuth` security scheme's description)
 
 **Interfaces:**
-- Produces: `checkJwt` (Express middleware, exported from `lib/auth.ts`), `requireAuth` (array of middleware, same import path and usage every other route file already has: `router.get('/me', requireAuth, handler)`), `EMAIL_CLAIM` / `EMAIL_VERIFIED_CLAIM` (string constants, exported from `lib/auth.ts`), `AuthenticatedRequest` (interface, same shape as today plus an `auth?: { payload: Record<string, unknown> }` field), `withoutAuth0Id` (exported from `lib/cache.ts`, same shape as the old `withoutPassword`), `createTestUser(app): Promise<TestUser>` (unchanged signature and return shape — `{ id, email, token, cleanup }` — so every other `api/*.test.ts` file needs zero changes).
+- Produces: `checkJwt` (Express middleware, exported from `lib/auth.ts`), `requireAuth` (array of middleware, same import path and usage every other route file already has: `router.get('/me', requireAuth, handler)`), `EMAIL_CLAIM` / `EMAIL_VERIFIED_CLAIM` (string constants, exported from `lib/auth.ts`), `AuthenticatedRequest` (interface, same shape as today plus a `user?: { id: number }` field — `auth` itself comes from express-oauth2-jwt-bearer's own global `Express.Request` declaration, typed `AuthResult` with `payload: JWTPayload`, not redeclared here), `withoutAuth0Id` (exported from `lib/cache.ts`, same shape as the old `withoutPassword`), `createTestUser(app): Promise<TestUser>` (unchanged signature and return shape — `{ id, email, token, cleanup }` — so every other `api/*.test.ts` file needs zero changes).
 - Consumes: nothing from earlier tasks.
 
 This is one atomic task: the schema change removes the `password` column, so the old bcrypt-based routes and the new Auth0-based ones cannot coexist even transiently in one working tree.
@@ -192,15 +192,35 @@ if (testSigningSecret && process.env.NODE_ENV === 'production') {
     throw new Error('AUTH0_TEST_SIGNING_SECRET must not be set in production')
 }
 
-// ISSUER_BASE_URL and AUDIENCE are read automatically from the
-// environment either way — only the signing algorithm/secret differs.
+/*
+ * The two branches must not share a code path here: express-oauth2-jwt-bearer
+ * runs OIDC discovery (a real network fetch to <issuerBaseURL>/.well-known/
+ * openid-configuration) whenever `issuerBaseURL` is set — even if `secret`
+ * is also set. Passing `issuer` instead of `issuerBaseURL` is the library's
+ * documented way to skip discovery for a non-standard (HS256-shared-secret)
+ * setup, so the HS256 branch reads ISSUER_BASE_URL/AUDIENCE itself and
+ * passes them as `issuer`/`audience` — it must NOT fall through to
+ * `auth()`'s own env-var auto-detection, which reads `issuerBaseURL` and
+ * would try to reach a fake/unreachable test issuer over the network.
+ * Verified with a standalone spike (real express-oauth2-jwt-bearer install,
+ * unresolvable issuer domain, `issuer`+`secret`+`tokenSigningAlg` config):
+ * request completed locally with no network attempt.
+ */
 export const checkJwt = testSigningSecret
-    ? auth({ secret: testSigningSecret, tokenSigningAlg: 'HS256' })
-    : auth()
+    ? auth({
+          issuer: process.env.ISSUER_BASE_URL,
+          audience: process.env.AUDIENCE,
+          secret: testSigningSecret,
+          tokenSigningAlg: 'HS256',
+      })
+    : auth() // production: reads ISSUER_BASE_URL/AUDIENCE and does real JWKS discovery
 
+// express-oauth2-jwt-bearer already declares `req.auth` globally (typed as
+// AuthResult, payload: JWTPayload) in its own .d.ts — redeclaring it here
+// with an incompatible type would fail to compile (TS2430: interface
+// incorrectly extends Request). Only `user` is new.
 export interface AuthenticatedRequest extends Request {
     user?: { id: number }
-    auth?: { payload: Record<string, unknown> }
 }
 
 async function resolveUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
@@ -653,7 +673,7 @@ VITE_AUTH0_AUDIENCE=https://your-api-identifier
 
 - [ ] **Step 3: Add the token bridge to `src/services/api.ts`**
 
-Add near the top (after `ApiError`, before `getToken`/`setToken`/`clearToken` — which Task 4 deletes):
+Add near the top (after `ApiError`, before `getToken`/`setToken`/`clearToken` — those three stay in place for now since `src/services/auth.ts` still imports them; Task 4 Step 7 deletes them once that file no longer does):
 
 ```ts
 let tokenGetter: (() => Promise<string>) | null = null
@@ -762,6 +782,7 @@ createRoot(document.getElementById('root')!).render(
       authorizationParams={{
         redirect_uri: window.location.origin,
         audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+        scope: 'openid profile email offline_access',
       }}
       cacheLocation="localstorage"
       useRefreshTokens
@@ -774,7 +795,7 @@ createRoot(document.getElementById('root')!).render(
 )
 ```
 
-`useRefreshTokens` is a plan-level addition beyond what the spec specified: without it, a silently-expired access token falls back to an iframe-based renewal against Auth0's session cookie, which modern browsers' third-party-cookie blocking makes unreliable. Refresh tokens avoid the iframe entirely.
+`useRefreshTokens` is a plan-level addition beyond what the spec specified: without it, a silently-expired access token falls back to an iframe-based renewal against Auth0's session cookie, which modern browsers' third-party-cookie blocking makes unreliable. Refresh tokens avoid the iframe entirely. `useRefreshTokens` alone is a no-op, though — Auth0 only issues a refresh token when `offline_access` is in the requested scope, so `authorizationParams.scope` must request it explicitly (Task 1's Step 1 also needs the SPA application's Refresh Token grant enabled, since a scope request alone doesn't turn on a grant the application isn't allowed to use).
 
 - [ ] **Step 6: Verify the build**
 
@@ -803,6 +824,7 @@ git commit -m "Add Auth0Provider, token bridge, and post-login sync gate"
 - Modify: `src/pages/Signup.tsx`
 - Modify: `src/pages/Profile.tsx`
 - Modify: `src/services/auth.ts`
+- Modify: `src/services/api.ts` (delete the now-dead `getToken`/`setToken`/`clearToken` exports, once this task's Step 6 removes their only remaining caller)
 
 **Interfaces:**
 - Consumes: `Auth0SyncGate`/`Auth0Provider` from Task 3 (must be in the tree for `useAuth0()` to work at all).
@@ -991,6 +1013,7 @@ Add an `onRedirectCallback` to `Auth0Provider` (added in Task 3) so Login's `app
       authorizationParams={{
         redirect_uri: window.location.origin,
         audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+        scope: 'openid profile email offline_access',
       }}
       cacheLocation="localstorage"
       useRefreshTokens
@@ -1022,7 +1045,25 @@ export async function getCurrentUser(): Promise<User> {
 
 (`signUp`, `signIn`, `signOut`, `isAuthenticated`, `updatePassword` deleted — every call site below uses `useAuth0()` directly or `ProtectedRoute`'s own check.)
 
-- [ ] **Step 7: Update `src/pages/Profile.tsx`**
+- [ ] **Step 7: Delete the now-dead token exports from `src/services/api.ts`**
+
+`src/services/auth.ts` was `getToken`/`setToken`/`clearToken`'s only caller besides `apiRequest` itself, and Task 3 Step 3 already switched `apiRequest` to `tokenGetter`. With Step 6 above rewriting `auth.ts`, nothing calls these three functions anymore (confirmed via `grep -rn "getToken\|setToken\|clearToken" src/` before writing this task — no other file references them). Delete all three from `src/services/api.ts`:
+
+```ts
+export function getToken(): string | null {
+  return localStorage.getItem('token')
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem('token', token)
+}
+
+export function clearToken(): void {
+  localStorage.removeItem('token')
+}
+```
+
+- [ ] **Step 8: Update `src/pages/Profile.tsx`**
 
 Delete the `PasswordForm` function entirely and its render in the `bento-grid` (`<PasswordForm />`).
 
@@ -1064,7 +1105,7 @@ Replace the `useEffect`'s 401 handling and `handleLogout`:
   }
 ```
 
-- [ ] **Step 8: Verify**
+- [ ] **Step 9: Verify**
 
 ```bash
 npm run build
@@ -1073,11 +1114,12 @@ npm run lint
 
 Manual verification (needs Task 1's real tenant): `npm run dev`, click Login/Signup, confirm the Auth0 Universal Login page loads with email/password, Google, and GitHub options, log in, land back on `/profile`, confirm the page loads (this exercises the whole chain: `Auth0SyncGate` → `POST /users/sync` → `GET /users/me` — needs the backend running with real `ISSUER_BASE_URL`/`AUDIENCE` matching Task 1's tenant, not the test bypass).
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 10: Commit**
 
 ```bash
 git add src/components/ProtectedRoute.tsx src/components/RedirectIfAuthenticated.tsx \
-  src/pages/Login.tsx src/pages/Signup.tsx src/pages/Profile.tsx src/services/auth.ts src/main.tsx
+  src/pages/Login.tsx src/pages/Signup.tsx src/pages/Profile.tsx src/services/auth.ts \
+  src/services/api.ts src/main.tsx
 git commit -m "Switch login, signup, and session state to Auth0"
 ```
 
@@ -1098,7 +1140,28 @@ git commit -m "Switch login, signup, and session state to Auth0"
       AUTH0_TEST_SIGNING_SECRET: ci-test-signing-secret-not-for-production-use-0000
 ```
 
-- [ ] **Step 2: Replace `JWT_SECRET` in the `e2e` job's `env` block** with the same three lines.
+- [ ] **Step 2: Point the `e2e` job at the real Auth0 tenant, not the test bypass**
+
+Task 6 rewrites `e2e/explore.spec.ts` to drive Auth0's real hosted Universal Login page and get back a real RS256-signed access token. If this job's backend validated with `AUTH0_TEST_SIGNING_SECRET` like the `backend` job does, it would reject that token outright (wrong algorithm, wrong issuer, wrong audience) — the HS256 bypass and a real Auth0 login are mutually exclusive for the same request. So this job needs Task 1's real tenant values instead, as repo secrets (`Settings → Secrets and variables → Actions`; Task 1's Step 6 already asks you to record these — add them here too once Task 1 is done).
+
+Replace `JWT_SECRET` in the `e2e` job's `env` block with:
+
+```yaml
+      ISSUER_BASE_URL: ${{ secrets.AUTH0_ISSUER_BASE_URL }}
+      AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
+```
+
+(No `AUTH0_TEST_SIGNING_SECRET` line here — omitting it is what keeps `checkJwt` on the real RS256-via-JWKS branch for this job.)
+
+The frontend dev server this job boots (via Playwright's `webServer` config, `npm run test:e2e`) also needs to redirect to the real tenant, so add these to the same `env` block:
+
+```yaml
+      VITE_AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      VITE_AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      VITE_AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
+```
+
+(`AUTH0_AUDIENCE` is reused for both — backend `AUDIENCE` and frontend `VITE_AUTH0_AUDIENCE` must already match exactly per Task 1 Step 2, so one secret covers both.)
 
 - [ ] **Step 3: Verify locally**
 

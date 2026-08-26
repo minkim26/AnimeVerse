@@ -18,18 +18,6 @@ export function setAccessTokenGetter(fn: () => Promise<string>): void {
   tokenGetter = fn
 }
 
-export function getToken(): string | null {
-  return localStorage.getItem('token')
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem('token', token)
-}
-
-export function clearToken(): void {
-  localStorage.removeItem('token')
-}
-
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown

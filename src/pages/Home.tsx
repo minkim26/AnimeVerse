@@ -1,8 +1,8 @@
 import { Link } from 'react-router'
 import { ThumbsUp, TrendingUp, Clock, Shuffle } from 'lucide-react'
+import { useAuth0 } from '@auth0/auth0-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
-import { isAuthenticated } from '../services/auth.ts'
 import usePageMeta from '../hooks/usePageMeta.ts'
 
 const FEATURES = [
@@ -47,7 +47,7 @@ export default function Home() {
     description:
       "AnimeVerse recommends anime tailored to your taste — swipe through a discovery deck, then get personalized picks powered by taste-vector matching.",
   })
-  const loggedIn = isAuthenticated()
+  const { isAuthenticated: loggedIn } = useAuth0()
 
   return (
     <div className="min-h-screen flex flex-col">

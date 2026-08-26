@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
 import { Link } from 'react-router'
 import { Loader2 } from 'lucide-react'
+import { useAuth0 } from '@auth0/auth0-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
-import { getCurrentUser, signOut, updatePassword, type User } from '../services/auth.ts'
+import { getCurrentUser, type User } from '../services/auth.ts'
 import { ApiError } from '../services/api.ts'
 import { getPreferences } from '../services/preferences.ts'
 import { getRandomQuote, type Quote } from '../services/quotes.ts'
@@ -80,77 +80,6 @@ function AvatarUpload({ user, onUploaded, onThumbnailReady }: AvatarUploadProps)
           {error && <p className="text-xs text-[var(--color-error)] mt-2">{error}</p>}
         </div>
       </div>
-    </section>
-  )
-}
-
-function PasswordForm() {
-  const [oldPassword, setOldPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setMessage('')
-    setError('')
-
-    if (newPassword !== confirmPassword) {
-      setError('New password and confirm password do not match.')
-      return
-    }
-
-    try {
-      await updatePassword(oldPassword, newPassword)
-      setOldPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-      setMessage('Password updated successfully!')
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'An error occurred while updating the password.')
-    }
-  }
-
-  return (
-    <section className="col-span-6 md:col-span-3 surface-card p-6 sm:p-8">
-      <h2 className="font-display text-xl font-semibold tracking-tight mb-4 text-[var(--color-ink)]">
-        Update Your Password
-      </h2>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="password"
-          required
-          placeholder="Old Password"
-          value={oldPassword}
-          onChange={(e) => setOldPassword(e.target.value)}
-          className="w-full rounded-full px-5 py-3 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
-        />
-        <input
-          type="password"
-          required
-          minLength={8}
-          placeholder="New Password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          className="w-full rounded-full px-5 py-3 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
-        />
-        <input
-          type="password"
-          required
-          placeholder="Confirm New Password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className="w-full rounded-full px-5 py-3 text-sm bg-[var(--color-surface)] outline-none border border-[var(--color-line)] focus:border-[var(--color-accent)]"
-        />
-
-        {message && <p className="text-xs text-[var(--color-success)]">{message}</p>}
-        {error && <p className="text-xs text-[var(--color-error)]">{error}</p>}
-
-        <button type="submit" className="btn btn-accent px-6 py-3 text-sm">
-          Update Password
-        </button>
-      </form>
     </section>
   )
 }
@@ -321,25 +250,22 @@ export default function Profile() {
     description: "Manage your AnimeVerse account, avatar, and password, and revisit anime you've swiped on.",
   })
   const [user, setUser] = useState<User | null>(null)
-  const navigate = useNavigate()
+  const { logout } = useAuth0()
 
   useEffect(() => {
     getCurrentUser()
       .then(setUser)
       .catch((err) => {
-        // Only a real 401 means the session is invalid. Anything else
-        // (network hiccup, or the fetch aborting because the user navigated
-        // away before it resolved) shouldn't wipe a still-valid token.
+        // Only a real 401 means the session is invalid — a network hiccup
+        // or the fetch aborting on navigation shouldn't force a logout.
         if (err instanceof ApiError && err.status === 401) {
-          signOut()
-          navigate('/login')
+          logout({ logoutParams: { returnTo: window.location.origin } })
         }
       })
-  }, [navigate])
+  }, [logout])
 
   function handleLogout() {
-    signOut()
-    navigate('/login')
+    logout({ logoutParams: { returnTo: window.location.origin } })
   }
 
   return (
@@ -388,7 +314,6 @@ export default function Profile() {
             />
           )}
 
-          <PasswordForm />
           <PreferencesSummary />
           <TitleGenerator />
           <QuoteGenerator />

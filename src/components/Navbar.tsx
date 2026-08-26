@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { Sparkles, Menu, X } from 'lucide-react'
-import { isAuthenticated, signOut } from '../services/auth.ts'
+import { useAuth0 } from '@auth0/auth0-react'
 
 export default function Navbar() {
   const { pathname } = useLocation()
-  const navigate = useNavigate()
-  const loggedIn = isAuthenticated()
+  const { isAuthenticated: loggedIn, logout } = useAuth0()
   const [menuOpen, setMenuOpen] = useState(false)
 
   function closeMenu() {
@@ -15,8 +14,7 @@ export default function Navbar() {
 
   function handleLogout() {
     closeMenu()
-    signOut()
-    navigate('/login')
+    logout({ logoutParams: { returnTo: window.location.origin } })
   }
 
   const linkClass = (path: string) =>

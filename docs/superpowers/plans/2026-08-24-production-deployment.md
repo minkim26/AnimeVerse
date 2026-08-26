@@ -1,5 +1,7 @@
 # Production Deployment Implementation Plan
 
+> **Superseded.** This plan executed the GCP + DuckDNS + Caddy design and got it running, but that design's ~$3.65/month cost gap led to a follow-up move: the backend now runs on a home-lab Proxmox LXC reached through a Cloudflare Tunnel instead, at genuinely $0/month with no public IP. See CLAUDE.md and README.md for the current setup. Kept here as the record of how the GCP deployment was actually built and the reasoning behind each choice.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Read the "Execution Model" note below before starting.** Unlike a typical code plan, several tasks here require the human operator's own browser/account access and cannot be completed by an agent alone.
 
 **Goal:** Get AnimeVerse reachable at a public URL for close to $0/month, with `api` and `consumer` running continuously (no cold starts) on a free-tier VPS, Postgres moved to Supabase, and auto-deploy on push to `main`. (The $0 goal isn't fully met: GCP charges for the VM's external IP. See the spec's "Real recurring cost" under Component 1.)

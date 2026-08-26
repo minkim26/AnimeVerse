@@ -48,10 +48,10 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       # rabbitmq-diagnostics itself boots a small Erlang runtime to connect,
-      # which on a constrained box (e.g. a 1GB-RAM e2-micro) can take ~25s
-      # on its own, and RabbitMQ's own startup can take well over a minute
-      # under memory pressure. Local dev's compose.yml keeps the tighter
-      # defaults since that's a normal dev machine.
+      # which on a memory-constrained host can take ~25s on its own, and
+      # RabbitMQ's own startup can take well over a minute under memory
+      # pressure. Local dev's compose.yml keeps the tighter defaults since
+      # that's a normal dev machine.
       test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
       interval: 30s
       timeout: 30s

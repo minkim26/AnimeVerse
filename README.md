@@ -206,25 +206,25 @@ Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorizat
 
 ## Continuous Integration
 
-`.github/workflows/ci.yml` runs on every push/PR to `main`, in three jobs: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against service containers, then runs the Playwright suite from the root package). None of the jobs deploy anywhere; backend deploys are currently manual (see [Deployment](#deployment)).
+`.github/workflows/ci.yml` runs on every push/PR to `main`, in three jobs: `frontend` (lint, build, Vitest), `backend` (type-check, migrate+seed, Vitest against real Postgres/Redis/RabbitMQ service containers), and `e2e` (boots the real backend against service containers, then runs the Playwright suite from the root package). None of these jobs deploy anywhere themselves; `deploy.yml` runs separately once `ci.yml` succeeds on `main` (see [Deployment](#deployment)).
 
 A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_dispatch`-only (manual trigger, never runs on push/PR) and regenerates the Linux visual-regression baselines in `e2e/visual.spec.ts-snapshots/`, then opens a PR with the result. See `CLAUDE.md`'s "UI Change Workflow" section for when to run it.
 
 ## Known Limitations
 
 - Watchlist and Reviews have full Prisma models and REST endpoints but no frontend UI. Nothing in the app calls them.
-- The backend is a single VPS with no redundancy. If it goes down, `api`, `consumer`, `rabbitmq`, and `redis` all go down together. Accepted trade-off at this app's scale.
+- The backend is a single Proxmox host with no redundancy. If it goes down, `api`, `consumer`, `rabbitmq`, `redis`, and `cloudflared` all go down together, taking the public site with them since `cloudflared` is the only path in. Accepted trade-off at this app's scale.
 - `rabbitmq` and `redis` have no backups. Redis is pure cache, safe to lose. RabbitMQ persists its queues to the `rabbitmq_data` volume, so pending and dead-lettered messages survive a container restart or recreation, but not a lost or deleted volume.
 - The Playwright E2E suite drives a real signup/login and lets the browser hit AniList's real GraphQL API. Nothing is mocked, so a slow AniList response can fail the suite even when the app code is correct.
 
 ## Deployment
 
-The frontend deploys to Cloudflare Workers (static assets) from `main`, live at https://animeverse.minsteww26.workers.dev. Cloudflare's GitHub integration builds and deploys on every push, no extra workflow needed.
+The frontend deploys to Cloudflare Workers (static assets) from `main`, live at https://animeverse.minkim26.tech. Cloudflare's GitHub integration builds and deploys on every push, no extra workflow needed.
 
-The backend runs on a GCP `e2-micro` VPS through `anime-verse-backend/compose.prod.yml`: `api`, `consumer`, `rabbitmq`, and `redis` in Docker Compose, with Caddy in front handling automatic TLS. It's live at https://animeverse-app.duckdns.org. Postgres runs on Supabase rather than self-hosted, connected through its session pooler (Supabase's direct connection dropped free IPv4 support, and the VPS only has IPv4).
+The backend runs on an LXC container on a home-lab Proxmox host, through `anime-verse-backend/compose.prod.yml`: `api`, `consumer`, `rabbitmq`, `redis`, and `cloudflared` in Docker Compose. `cloudflared` opens an outbound-only Cloudflare Tunnel, so the box has no public IP and no inbound ports at all; Cloudflare's edge terminates TLS and proxies `https://api.minkim26.tech` straight to it. Postgres runs on Supabase rather than self-hosted, connected through its session pooler.
 
-The `e2-micro` instance itself is free, but GCP has charged for a VM's external IP address since February 2024, so this deployment runs at roughly $3.65/month rather than $0. See the design spec's "Real recurring cost" and "Roadmap" sections below for the full breakdown and a serverless alternative, not built yet, that would actually reach $0/month.
+This setup has no ongoing hosting cost: no VM, no reserved IP, nothing billed. A previous iteration ran on a GCP `e2-micro` VM (`https://animeverse-app.duckdns.org`), which did carry a real ~$3.65/month charge for its external IP; that VM is being decommissioned now that the Proxmox setup is verified.
 
-Backend deploys are manual for now: SSH into the VPS, `git pull`, then `docker compose -f compose.prod.yml up -d --build`. An auto-deploy workflow (`deploy.yml`, triggered on a successful `CI` run against `main`) is designed in the spec/plan below but not yet built.
+Backend deploys are automatic: `.github/workflows/deploy.yml` triggers on a successful `CI` run against `main`, joins the home-lab's Tailscale network (the deploy target has no public IP either), and runs `git pull && docker compose -f compose.prod.yml up -d --build` over SSH.
 
-The full provisioning steps and the reasoning behind each choice live in `docs/superpowers/specs/2026-08-24-production-deployment-design.md` and `docs/superpowers/plans/2026-08-24-production-deployment.md`.
+`docs/superpowers/specs/2026-08-24-production-deployment-design.md` and `docs/superpowers/plans/2026-08-24-production-deployment.md` cover the original GCP-based deployment: its provisioning steps, the reasoning behind each choice, and the cost analysis that motivated the move off it. Neither document describes the current Proxmox/Cloudflare Tunnel setup.

@@ -11,8 +11,8 @@ Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
   |
   |-- calls ------------------> Express API (:8000)
                                    |
-                                   |-- Prisma ------> Postgres (users, preferences,
-                                   |                   watchlist, reviews, quotes, titles)
+                                   |-- Prisma ------> Postgres (users, preferences, watchlist,
+                                   |                   reviews, quotes, titles, anime cache, swipes)
                                    |
                                    |-- Redis -------> rate limiting (auth, avatar upload)
                                    |                   + response cache (users/me, preferences/me,
@@ -48,7 +48,7 @@ Explore's Browse & Search and the profile page's random-anime feature call AniLi
 | Cache / rate limiter | Redis | Docker `redis` service | — |
 | File storage | Supabase Storage | Hosted (Supabase project) | — |
 
-There is no reverse proxy or API gateway — the frontend talks to the Express API and to AniList directly, over whatever origins `VITE_API_URL` and AniList's public GraphQL API resolve to.
+No application-level reverse proxy or API gateway sits between the frontend and the API: no routing, auth, or rate-limiting logic lives there, and the frontend calls the Express API and AniList directly over whatever origins `VITE_API_URL` and AniList's public GraphQL API resolve to. In production, Cloudflare's tunnel does terminate TLS and proxy `api.minkim26.tech` at the network edge (see [Deployment status](#deployment-status) below); there's just no request-handling layer in front of the API itself.
 
 ## Request flow: a typical authenticated request
 

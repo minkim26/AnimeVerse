@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import request from 'supertest'
 
 import app from '../app.ts'
+import openapiSpec from '../lib/swagger.ts'
 
 describe('CORS', () => {
     // FRONTEND_URL is a comma-separated list (e.g. local dev needs both the
@@ -38,6 +39,23 @@ describe('GET /health', () => {
 
         expect(res.status).toBe(200)
         expect(res.body).toEqual({ status: 'ok' })
+    })
+})
+
+describe('GET /api-docs', () => {
+    it('serves the swagger UI', async () => {
+        const res = await request(app).get('/api-docs/')
+
+        expect(res.status).toBe(200)
+        expect(res.text).toContain('swagger-ui')
+    })
+
+    // Guards against a bad glob or malformed @openapi annotation silently
+    // publishing an empty or incomplete spec while the build stays green.
+    it('generates a spec covering every route', () => {
+        const { paths } = openapiSpec as { paths: Record<string, unknown> }
+        expect(Object.keys(paths)).toHaveLength(17)
+        expect(paths).toHaveProperty(['/health', 'get'])
     })
 })
 

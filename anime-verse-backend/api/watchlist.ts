@@ -60,8 +60,12 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res) => {
  *     responses:
  *       201:
  *         description: Created or updated
+ *       400:
+ *         description: Invalid request body
  *       401:
  *         description: Missing or invalid token
+ *       429:
+ *         description: Rate limit exceeded
  */
 router.post('/', requireAuth, watchlistLimiter, async (req: AuthenticatedRequest, res) => {
     const data = WatchlistItem.parse(req.body)

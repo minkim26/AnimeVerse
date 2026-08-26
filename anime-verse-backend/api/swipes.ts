@@ -45,8 +45,9 @@ const router = Router()
  *                     maxItems: 100
  *                     items:
  *                       type: object
+ *                       required: [name, rank]
  *                       properties:
- *                         name: { type: string }
+ *                         name: { type: string, minLength: 1, maxLength: 100 }
  *                         rank: { type: number, minimum: 0, maximum: 100 }
  *                   isAdult: { type: boolean }
  *     responses:

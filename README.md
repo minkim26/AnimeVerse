@@ -111,7 +111,7 @@ Never commit the filled-in files.
 
 ## API Reference
 
-Full interactive docs are served live at `/api-docs` on any running instance (`http://localhost:8000/api-docs` locally, `https://api.minkim26.tech/api-docs` in production) — generated from OpenAPI annotations on each route, so they can't drift out of sync with the code the way a hand-maintained table would.
+Full interactive docs are served at `/api-docs` on any running instance (`http://localhost:8000/api-docs` locally, `https://api.minkim26.tech/api-docs` in production), generated from OpenAPI annotations kept alongside each route.
 
 ## Continuous Integration
 

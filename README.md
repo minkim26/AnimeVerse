@@ -1,6 +1,6 @@
 # AnimeVerse
 
-AnimeVerse is an anime recommendation web app. Users sign up, pick genre preferences, and get personalized recommendations plus a genre/sort/search browser against the [AniList GraphQL API](https://anilist.gitbook.io/anilist-apiv2-docs/). A profile page lets users manage their account, upload a real profile picture, and play with random anime quote/title/picture generators.
+AnimeVerse is an anime recommendation web app. Users sign up, swipe through an AniList-backed deck to build a taste profile, and get personalized "For You" picks plus a genre/sort/search browser against the [AniList GraphQL API](https://anilist.gitbook.io/anilist-apiv2-docs/). A profile page lets users manage their account, upload a real profile picture, and play with random anime quote/title/picture generators.
 
 The app is a React SPA backed by a single Express + Prisma + Postgres API, orchestrated with Docker Compose. Supabase is used exclusively for file storage (avatar images); it is not used for auth or as the primary database.
 
@@ -9,58 +9,30 @@ The app is a React SPA backed by a single Express + Prisma + Postgres API, orche
 ## Features
 
 - **Signup / Login:** email + password auth against the API, JWT stored in `localStorage`.
-- **Preferences:** pick favorite genres (action, comedy, fantasy, horror, mystery, romance, thriller), persisted per-user in Postgres.
-- **Explore:** "For You" picks tuned to your taste, plus Browse & Search (genre chips, sort, and text search against AniList's full catalog).
+- **Discover:** swipe (skip / like / love) through an AniList-backed deck; each swipe feeds a taste vector computed fresh from your swipe history.
+- **Explore:** "For You" picks ranked by taste-vector similarity, plus Browse & Search (genre chips, sort, and text search against AniList's full catalog).
 - **Profile:** change password, upload a real profile picture (async thumbnail generation), view saved preferences, and fetch a random anime, anime title, and anime quote.
-- **Auth gating:** `/preferences`, `/explore`, and `/profile` redirect to `/login` if no token is present (see `src/components/ProtectedRoute.tsx`).
+- **Auth gating:** `/preferences`, `/discover`, `/explore`, and `/profile` redirect to `/login` if no token is present (see `src/components/ProtectedRoute.tsx`).
 
 ## Tech Stack
 
 | Layer | Stack |
 |---|---|
 | Frontend | React 19 + Vite 7 + TypeScript, Tailwind CSS v4, react-router v8 |
-| Backend | Express 5 + TypeScript, Prisma 7 (Postgres), Zod 4 validation |
+| Backend | Express 5 + TypeScript, Prisma 7 (Postgres + pgvector), Zod 4 validation |
 | Auth | Self-issued JWTs (`jsonwebtoken` + `bcryptjs`), not a third-party auth provider |
 | File storage | Supabase Storage (avatar originals + generated thumbnails) |
 | Async processing | RabbitMQ + a standalone `consumer.ts` worker using `sharp` for thumbnailing |
 | Caching / rate limiting | Redis (`express-rate-limit` + `rate-limit-redis` on auth/avatar endpoints, response caching on read-heavy GETs) |
+| API docs | OpenAPI, served live at `/api-docs` |
 | Orchestration | Docker Compose (`api`, `consumer`, `postgres`, `rabbitmq`, `redis`, `initdb`) |
 
 ## Architecture
 
-```
-Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
-  |
-  |-- calls directly ------------------> AniList public API (src/services/anilist.ts)
-  |
-  |-- calls ------------------> Express API (:8000)
-                                   |
-                                   |-- Prisma ------> Postgres (users, preferences,
-                                   |                   watchlist, reviews, quotes, titles)
-                                   |
-                                   |-- Redis -------> rate limiting (auth, avatar upload)
-                                   |                   + response cache (users/me, preferences/me,
-                                   |                   quotes/random, titles/random)
-                                   |
-                                   |-- avatar upload -> Supabase Storage (avatars bucket)
-                                   |                     + publishes a message to RabbitMQ
-                                   |
-                                   |                   RabbitMQ (avatar-thumbnails queue,
-                                   |                   dead-lettered to avatar-thumbnails.dlq
-                                   |                   on failure)
-                                   |                     |
-                                   |                     v
-                                   |                   consumer.ts worker
-                                   |                     -- downloads original from Supabase
-                                   |                     -- resizes to 128x128 via sharp
-                                   |                     -- uploads thumbnail to Supabase Storage
-                                   |                     -- writes avatarThumbnailUrl via Prisma
-                                   |                     -- invalidates the cached users/me entry
-```
+The backend is one Express API, not the four-Flask-microservice split the pre-rewrite version used — see the legacy-site callout above. The one deliberately asynchronous piece is avatar uploads: the API responds as soon as the original lands in Supabase Storage, and a separate RabbitMQ-consuming worker (`consumer.ts`) generates the thumbnail in the background. AniList data (Discover's deck, Browse & Search, the random-anime widget) is fetched directly from the browser rather than proxied, since there's nothing there worth caching or gating server-side.
 
-Explore's Browse & Search and the profile page's random-anime feature call AniList directly from the browser. No backend route proxies or caches that traffic.
-
-See [docs/architecture.md](docs/architecture.md) for a deeper breakdown of each service and [docs/avatar-upload-pipeline.md](docs/avatar-upload-pipeline.md) for the full avatar upload request lifecycle.
+- [docs/architecture.md](docs/architecture.md) — full service breakdown and request-flow diagrams
+- [docs/avatar-upload-pipeline.md](docs/avatar-upload-pipeline.md) — the avatar pipeline's full request lifecycle
 
 ## Prerequisites
 
@@ -74,7 +46,7 @@ See [docs/architecture.md](docs/architecture.md) for a deeper breakdown of each 
 
 ```bash
 cd anime-verse-backend
-cp .env.example .env.production   # fill in JWT_SECRET, ADMIN_CRON_SECRET, SUPABASE_URL, SUPABASE_KEY
+cp .env.example .env.production   # see Environment Variables below
 docker compose up
 ```
 
@@ -100,33 +72,18 @@ npx tsx consumer.ts
 
 ```bash
 npm install
-cp .env.example .env              # VITE_API_URL and VITE_SITE_URL, see Environment Variables below
+cp .env.example .env              # see Environment Variables below
 npm run dev                       # http://localhost:5173
 ```
 
 ## Environment Variables
 
-### `anime-verse-backend/.env.local` / `.env.production`
+Every variable is documented inline where you'll actually set it:
 
-| Variable | Purpose |
-|---|---|
-| `POSTGRES_URL` | Prisma connection string. `postgres` as host inside Docker Compose, `localhost` outside it. |
-| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Used by the official `postgres` image to initialize the database (Docker Compose only). |
-| `JWT_SECRET` | Signs/verifies auth JWTs. Use a long random value outside local dev. |
-| `ADMIN_CRON_SECRET` | Shared secret the `refresh-anime-cache.yml` cron workflow sends as `X-Cron-Secret` to `POST /admin/anime-cache/refresh`. Must be at least 32 characters; the server refuses to start otherwise. |
-| `PORT` | API listen port (defaults to `8000`). |
-| `SUPABASE_URL` | The AnimeVerse Supabase project's API URL. |
-| `SUPABASE_KEY` | Supabase **service_role** key. Server-side only, never shipped to the frontend. |
-| `RABBITMQ_URL` | RabbitMQ connection string. `rabbitmq` as host inside Docker Compose, `localhost` outside it. |
-| `REDIS_URL` | Redis connection string, used for rate limiting and response caching. `redis` as host inside Docker Compose, `localhost` outside it. |
-| `FRONTEND_URL` | Origin allowed to make cross-origin requests to the API (CORS). The server refuses to start if this is unset. |
+- Backend: [`anime-verse-backend/.env.example`](anime-verse-backend/.env.example) → copy to `.env.local` (local dev) or `.env.production` (Docker)
+- Frontend: [`.env.example`](.env.example) → copy to `.env`
 
-### root `.env` (Vite, safe to expose client-side)
-
-| Variable | Purpose |
-|---|---|
-| `VITE_API_URL` | Base URL of the Express API (defaults to `http://localhost:8000`). |
-| `VITE_SITE_URL` | Canonical site origin used for `<link rel="canonical">`, Open Graph tags, and JSON-LD (defaults to `window.location.origin` at runtime if unset). Must be set to the real production domain before `npm run build` for an actual deploy — see the comment above it in `.env.example`. |
+Never commit the filled-in files.
 
 ## Available Scripts
 
@@ -154,55 +111,7 @@ npm run dev                       # http://localhost:5173
 
 ## API Reference
 
-Base URL: `http://localhost:8000`. Routes marked **auth** require an `Authorization: Bearer <token>` header.
-
-| Method | Path | Auth | Body | Notes |
-|---|---|---|---|---|
-| POST | `/users` | | `{ email, password }` | Signup. Rate limited (10 requests / 15 min / IP). |
-| POST | `/users/login` | | `{ email, password }` | Returns `{ token }`. Rate limited (10 requests / 15 min / IP). |
-| GET | `/users/me` | ✓ | | Current user (password field stripped). Cached in Redis for 5 min. |
-| PATCH | `/users/me/password` | ✓ | `{ oldPassword, newPassword }` | Re-verifies `oldPassword` via bcrypt before updating |
-| GET | `/preferences/me` | ✓ | | Returns `{ genres: [] }` if none saved. Cached in Redis for 5 min. |
-| PUT | `/preferences/me` | ✓ | `{ genres: string[] }` | Full-replace upsert |
-| GET | `/watchlist` | ✓ | | No frontend page consumes this yet |
-| POST | `/watchlist` | ✓ | `{ animeId, title?, posterUrl? }` | Upsert on `(userId, animeId)` |
-| DELETE | `/watchlist/:animeId` | ✓ | | |
-| GET | `/reviews` | ✓ | | No frontend page consumes this yet |
-| POST | `/reviews` | ✓ | `{ animeId, rating, reviewText }` | Upsert on `(userId, animeId)` |
-| DELETE | `/reviews/:animeId` | ✓ | | |
-| GET | `/quotes/random` | | | `{ quote, character, anime }`. Full list cached in Redis for 1 hour. |
-| GET | `/titles/random` | | | `{ title, episodes }`. Full list cached in Redis for 1 hour. |
-| POST | `/avatar` | ✓ | `multipart/form-data`, field `file` | Uploads original to Supabase, publishes a thumbnail job, returns `{ avatarUrl }`. Rate limited (20 requests / hour / user). |
-| GET | `/health` | | | `{ status: 'ok' }` |
-
-## Project Structure
-
-```
-.
-├── src/                                  # React frontend
-│   ├── pages/                            # Home, Login, Signup, Preferences,
-│   │                                      # Explore, Profile, PrivacyPolicy, NotFound
-│   ├── components/                       # Navbar, Footer, ProtectedRoute, AnimeCard, GenreCheckboxGroup
-│   ├── services/                         # api.ts (fetch wrapper), auth, preferences, anilist,
-│   │                                      # quotes, titles, avatar (one client per resource)
-│   └── data/genres.ts
-├── docs/
-│   ├── architecture.md
-│   ├── supabase-setup.md
-│   ├── avatar-upload-pipeline.md
-│   ├── legacy-static-site-readme.md      # archived pre-rewrite README
-│   └── microservice-a-profile-image.md   # archived original microservice README
-└── anime-verse-backend/
-    ├── api/                              # users, preferences, watchlist, reviews, quotes, titles, avatar
-    ├── lib/                              # prisma.ts, auth.ts, zod.ts, supabase.ts, redis.ts,
-    │                                      # cache.ts, rateLimit.ts, queue.ts
-    ├── prisma/                           # schema.prisma, migrations, seed.ts
-    ├── data/                             # quotes.json, titles.json (seed source)
-    ├── server.ts                         # Express app + error handler
-    ├── consumer.ts                       # RabbitMQ worker, avatar thumbnailing
-    ├── compose.yml
-    └── Dockerfile
-```
+Full interactive docs are served live at `/api-docs` on any running instance (`http://localhost:8000/api-docs` locally, `https://api.minkim26.tech/api-docs` in production) — generated from OpenAPI annotations on each route, so they can't drift out of sync with the code the way a hand-maintained table would.
 
 ## Continuous Integration
 
@@ -219,12 +128,8 @@ A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_
 
 ## Deployment
 
-The frontend deploys to Cloudflare Workers (static assets) from `main`, live at https://animeverse.minkim26.tech. Cloudflare's GitHub integration builds and deploys on every push, no extra workflow needed.
+The frontend deploys to Cloudflare Workers from `main` via Cloudflare's GitHub integration, live at https://animeverse.minkim26.tech. The backend runs on an LXC container on a home-lab Proxmox host (`anime-verse-backend/compose.prod.yml`: `api`, `consumer`, `rabbitmq`, `redis`, `cloudflared`), reachable through an outbound-only Cloudflare Tunnel, so the box has no public IP or inbound ports; Cloudflare's edge terminates TLS and proxies `https://api.minkim26.tech` straight to it. Postgres runs on Supabase, connected through its session pooler.
 
-The backend runs on an LXC container on a home-lab Proxmox host, through `anime-verse-backend/compose.prod.yml`: `api`, `consumer`, `rabbitmq`, `redis`, and `cloudflared` in Docker Compose. `cloudflared` opens an outbound-only Cloudflare Tunnel, so the box has no public IP and no inbound ports at all; Cloudflare's edge terminates TLS and proxies `https://api.minkim26.tech` straight to it. Postgres runs on Supabase rather than self-hosted, connected through its session pooler.
+Backend deploys are automatic: `.github/workflows/deploy.yml` triggers on a successful `CI` run against `main`, joins the home-lab's Tailscale network to reach it, and runs `git pull && docker compose -f compose.prod.yml up -d --build` over SSH.
 
-This setup has no ongoing hosting cost: no VM, no reserved IP, nothing billed. A previous iteration ran on a GCP `e2-micro` VM (`https://animeverse-app.duckdns.org`), which did carry a real ~$3.65/month charge for its external IP; that VM is being decommissioned now that the Proxmox setup is verified.
-
-Backend deploys are automatic: `.github/workflows/deploy.yml` triggers on a successful `CI` run against `main`, joins the home-lab's Tailscale network (the deploy target has no public IP either), and runs `git pull && docker compose -f compose.prod.yml up -d --build` over SSH.
-
-`docs/superpowers/specs/2026-08-24-production-deployment-design.md` and `docs/superpowers/plans/2026-08-24-production-deployment.md` cover the original GCP-based deployment: its provisioning steps, the reasoning behind each choice, and the cost analysis that motivated the move off it. Neither document describes the current Proxmox/Cloudflare Tunnel setup.
+This setup has no ongoing hosting cost. A previous iteration ran on a GCP `e2-micro` VM behind Caddy, which carried a real ~$3.65/month charge for its reserved external IP; that VM and its GCP project have since been decommissioned. See [docs/superpowers/specs/2026-08-24-production-deployment-design.md](docs/superpowers/specs/2026-08-24-production-deployment-design.md) and [docs/superpowers/plans/2026-08-24-production-deployment.md](docs/superpowers/plans/2026-08-24-production-deployment.md) for that original design and the cost analysis that motivated moving off it — neither describes the current Proxmox/Cloudflare Tunnel setup.

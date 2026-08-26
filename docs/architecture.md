@@ -2,6 +2,40 @@
 
 This is a deeper breakdown of AnimeVerse's services and how they talk to each other. For setup instructions, see the root [README.md](../README.md).
 
+## System diagram
+
+```
+Browser (React SPA, Vite dev server on :5173 / vite preview or any static host)
+  |
+  |-- calls directly ------------------> AniList public API (src/services/anilist.ts)
+  |
+  |-- calls ------------------> Express API (:8000)
+                                   |
+                                   |-- Prisma ------> Postgres (users, preferences,
+                                   |                   watchlist, reviews, quotes, titles)
+                                   |
+                                   |-- Redis -------> rate limiting (auth, avatar upload)
+                                   |                   + response cache (users/me, preferences/me,
+                                   |                   quotes/random, titles/random)
+                                   |
+                                   |-- avatar upload -> Supabase Storage (avatars bucket)
+                                   |                     + publishes a message to RabbitMQ
+                                   |
+                                   |                   RabbitMQ (avatar-thumbnails queue,
+                                   |                   dead-lettered to avatar-thumbnails.dlq
+                                   |                   on failure)
+                                   |                     |
+                                   |                     v
+                                   |                   consumer.ts worker
+                                   |                     -- downloads original from Supabase
+                                   |                     -- resizes to 128x128 via sharp
+                                   |                     -- uploads thumbnail to Supabase Storage
+                                   |                     -- writes avatarThumbnailUrl via Prisma
+                                   |                     -- invalidates the cached users/me entry
+```
+
+Explore's Browse & Search and the profile page's random-anime feature call AniList directly from the browser. No backend route proxies or caches that traffic.
+
 ## Services
 
 | Service | Tech | Runs where | Talks to |
@@ -69,4 +103,4 @@ A fourth workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_di
 
 ## Deployment status
 
-No production deployment target is configured. The old `static.yml` GitHub Pages workflow is gone entirely; nothing has replaced it. Running this stack anywhere other than local Docker Compose currently requires manually provisioning a host that can run `docker compose up` (Railway, Render, Fly.io, or a VPS) and pointing `VITE_API_URL` at it.
+AnimeVerse runs in production: frontend on Cloudflare Workers, backend on a home-lab Proxmox host behind a Cloudflare Tunnel, Postgres on Supabase. See the root [README.md](../README.md#deployment) for the current setup and deploy pipeline — this doc stays focused on how the services talk to each other, not where they run.

@@ -645,6 +645,7 @@ git commit -m "Replace self-issued JWT auth with Auth0 token validation"
 - Modify: `package.json`
 - Modify: `.env.example`
 - Modify: `src/main.tsx`
+- Modify: `src/App.tsx` (move `BrowserRouter` out — see Step 5)
 - Modify: `src/services/api.ts`
 - Create: `src/components/Auth0SyncGate.tsx`
 
@@ -762,11 +763,31 @@ export default function Auth0SyncGate({ children }: Auth0SyncGateProps) {
 }
 ```
 
-- [ ] **Step 5: Wrap `src/main.tsx` in `Auth0Provider` and `Auth0SyncGate`**
+- [ ] **Step 5: Move `BrowserRouter` above `Auth0Provider`, wrap `src/main.tsx` in both plus `Auth0SyncGate`**
+
+Task 4 Step 5 gives `Auth0Provider` a custom `onRedirectCallback` that calls `useNavigate()` — that hook only works inside `BrowserRouter`. `App.tsx` currently renders its own `<BrowserRouter>`, which would put the router *inside* `Auth0Provider`, the wrong way round for that hook to reach it. Move `BrowserRouter` here now so this file's structure only changes once.
+
+In `src/App.tsx`, remove the `BrowserRouter` import and unwrap it — `App` returns `<Routes>...</Routes>` directly, no wrapping element:
+
+```tsx
+import { Routes, Route } from 'react-router'
+// ...same page/component imports as before, unchanged
+
+export default function App() {
+  return (
+    <Routes>
+      {/* ...same routes as before, unchanged... */}
+    </Routes>
+  )
+}
+```
+
+In `src/main.tsx`:
 
 ```tsx
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { BrowserRouter } from 'react-router'
 import { Auth0Provider } from '@auth0/auth0-react'
 import '@fontsource-variable/fraunces'
 import '@fontsource-variable/inter'
@@ -776,21 +797,23 @@ import Auth0SyncGate from './components/Auth0SyncGate.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Auth0Provider
-      domain={import.meta.env.VITE_AUTH0_DOMAIN}
-      clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
-      authorizationParams={{
-        redirect_uri: window.location.origin,
-        audience: import.meta.env.VITE_AUTH0_AUDIENCE,
-        scope: 'openid profile email offline_access',
-      }}
-      cacheLocation="localstorage"
-      useRefreshTokens
-    >
-      <Auth0SyncGate>
-        <App />
-      </Auth0SyncGate>
-    </Auth0Provider>
+    <BrowserRouter>
+      <Auth0Provider
+        domain={import.meta.env.VITE_AUTH0_DOMAIN}
+        clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
+        authorizationParams={{
+          redirect_uri: window.location.origin,
+          audience: import.meta.env.VITE_AUTH0_AUDIENCE,
+          scope: 'openid profile email offline_access',
+        }}
+        cacheLocation="localstorage"
+        useRefreshTokens
+      >
+        <Auth0SyncGate>
+          <App />
+        </Auth0SyncGate>
+      </Auth0Provider>
+    </BrowserRouter>
   </StrictMode>,
 )
 ```
@@ -809,7 +832,7 @@ Expected: both pass. There's no automated test for this task (no component test 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add package.json package-lock.json .env.example src/main.tsx src/services/api.ts src/components/Auth0SyncGate.tsx
+git add package.json package-lock.json .env.example src/main.tsx src/App.tsx src/services/api.ts src/components/Auth0SyncGate.tsx
 git commit -m "Add Auth0Provider, token bridge, and post-login sync gate"
 ```
 
@@ -1004,9 +1027,29 @@ export default function Signup() {
 
 - [ ] **Step 5: Handle the redirect callback in `src/main.tsx`**
 
-Add an `onRedirectCallback` to `Auth0Provider` (added in Task 3) so Login's `appState.returnTo` actually navigates there instead of Auth0's default (stripping the URL and staying put):
+`Auth0Provider`'s default `onRedirectCallback` calls `window.history.replaceState(...)` directly, which changes the URL bar but never fires `popstate` and isn't routed through `BrowserRouter`'s own history object — React Router never learns the URL changed, so the app would keep rendering whatever page it was on before the redirect instead of Login's `appState.returnTo`. The fix needs `useNavigate()`, which only works inside a component rendered under `BrowserRouter` — so `Auth0Provider` itself has to move into a small wrapper component sitting inside the `BrowserRouter` that Task 3 Step 5 already placed above it.
+
+Replace the whole file:
 
 ```tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import { BrowserRouter, useNavigate } from 'react-router'
+import { Auth0Provider, type AppState } from '@auth0/auth0-react'
+import '@fontsource-variable/fraunces'
+import '@fontsource-variable/inter'
+import './index.css'
+import App from './App.tsx'
+import Auth0SyncGate from './components/Auth0SyncGate.tsx'
+
+function Auth0ProviderWithNavigate({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate()
+
+  function onRedirectCallback(appState?: AppState) {
+    navigate(appState?.returnTo ?? '/profile')
+  }
+
+  return (
     <Auth0Provider
       domain={import.meta.env.VITE_AUTH0_DOMAIN}
       clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
@@ -1017,11 +1060,27 @@ Add an `onRedirectCallback` to `Auth0Provider` (added in Task 3) so Login's `app
       }}
       cacheLocation="localstorage"
       useRefreshTokens
-      onRedirectCallback={(appState) => {
-        window.history.replaceState({}, '', appState?.returnTo ?? '/profile')
-      }}
+      onRedirectCallback={onRedirectCallback}
     >
+      {children}
+    </Auth0Provider>
+  )
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <Auth0ProviderWithNavigate>
+        <Auth0SyncGate>
+          <App />
+        </Auth0SyncGate>
+      </Auth0ProviderWithNavigate>
+    </BrowserRouter>
+  </StrictMode>,
+)
 ```
+
+(`BrowserRouter` position and `Auth0Provider`'s own props are otherwise unchanged from Task 3 Step 5 — only the wrapping component and `onRedirectCallback` are new.)
 
 - [ ] **Step 6: Trim `src/services/auth.ts`**
 

@@ -213,7 +213,7 @@ A separate workflow, `.github/workflows/update-e2e-snapshots.yml`, is `workflow_
 ## Known Limitations
 
 - Watchlist and Reviews have full Prisma models and REST endpoints but no frontend UI. Nothing in the app calls them.
-- The backend is a single VPS with no redundancy. If it goes down, `api`, `consumer`, `rabbitmq`, and `redis` all go down together. Accepted trade-off at this app's scale.
+- The backend is a single Proxmox host with no redundancy. If it goes down, `api`, `consumer`, `rabbitmq`, `redis`, and `cloudflared` all go down together, taking the public site with them since `cloudflared` is the only path in. Accepted trade-off at this app's scale.
 - `rabbitmq` and `redis` have no backups. Redis is pure cache, safe to lose. RabbitMQ persists its queues to the `rabbitmq_data` volume, so pending and dead-lettered messages survive a container restart or recreation, but not a lost or deleted volume.
 - The Playwright E2E suite drives a real signup/login and lets the browser hit AniList's real GraphQL API. Nothing is mocked, so a slow AniList response can fail the suite even when the app code is correct.
 

@@ -6,6 +6,9 @@
 // import job itself: https://auth0.com/docs/manage-users/user-migration/bulk-user-imports
 //
 // Usage: npx tsx scripts/export-users-for-auth0-import.ts > users-import.json
+//
+// The output contains bcrypt hashes. Never commit it, and delete it as soon
+// as the Auth0 import job succeeds.
 
 import prisma from '../lib/prisma.ts'
 

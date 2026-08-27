@@ -18,7 +18,10 @@ export async function loginViaAuth0(page: Page, email: string, password: string)
   await page.waitForURL(/\.auth0\.com\/u\/login/)
   await page.locator('input[name="username"]').fill(email)
   await page.locator('input[name="password"]').fill(password)
-  await page.locator('button[type="submit"]').click()
+  // Universal Login also renders "Continue with Google"/"Continue with
+  // GitHub" buttons that are type="submit" too — target the primary
+  // username/password submit button specifically.
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.waitForURL('**/profile')
 }
 

@@ -13,6 +13,10 @@ export function requiredEnv(name: string): string {
 // the actual rendered page (Auth0 occasionally changes markup between
 // login-experience versions) and adjust the selectors below.
 export async function loginViaAuth0(page: Page, email: string, password: string): Promise<void> {
+  // TEMPORARY diagnostic — remove once the post-code-exchange hang is root-caused.
+  page.on('console', (msg) => console.log(`[browser console] ${msg.type()}: ${msg.text()}`))
+  page.on('pageerror', (err) => console.log(`[browser pageerror] ${err.message}`))
+
   await page.goto('/login')
   await page.getByRole('button', { name: 'Log In' }).click()
   await page.waitForURL(/\.auth0\.com\/u\/login/)

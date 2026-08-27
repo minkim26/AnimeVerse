@@ -5,6 +5,7 @@ import prisma from './prisma.ts'
 
 export const EMAIL_CLAIM = 'https://animeverse.app/email'
 export const EMAIL_VERIFIED_CLAIM = 'https://animeverse.app/email_verified'
+export const PICTURE_CLAIM = 'https://animeverse.app/picture'
 
 /*
  * AUTH0_TEST_SIGNING_SECRET switches JWT verification from real Auth0

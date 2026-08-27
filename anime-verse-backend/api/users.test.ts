@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 
 import app from '../app.ts'
 import prisma from '../lib/prisma.ts'
-import { EMAIL_CLAIM, EMAIL_VERIFIED_CLAIM } from '../lib/auth.ts'
+import { EMAIL_CLAIM, EMAIL_VERIFIED_CLAIM, PICTURE_CLAIM } from '../lib/auth.ts'
 import { createTestUser } from '../test/helpers.ts'
 
 function uniqueEmail(): string {
@@ -30,6 +30,32 @@ describe('POST /users/sync', () => {
 
         expect(res.status).toBe(201)
         expect(res.body.email).toBe(email)
+        await prisma.user.delete({ where: { email } })
+    })
+
+    it("sets providerAvatarUrl from the token's picture claim on creation", async () => {
+        const email = uniqueEmail()
+        const picture = 'https://lh3.googleusercontent.com/a/some-google-photo'
+        const token = signToken(
+            { [EMAIL_CLAIM]: email, [EMAIL_VERIFIED_CLAIM]: true, [PICTURE_CLAIM]: picture },
+            { subject: `test|${email}` }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body.providerAvatarUrl).toBe(picture)
+        await prisma.user.delete({ where: { email } })
+    })
+
+    it('leaves providerAvatarUrl null when the token has no picture claim', async () => {
+        const email = uniqueEmail()
+        const token = signToken({ [EMAIL_CLAIM]: email, [EMAIL_VERIFIED_CLAIM]: true }, { subject: `test|${email}` })
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(201)
+        expect(res.body.providerAvatarUrl).toBeNull()
         await prisma.user.delete({ where: { email } })
     })
 

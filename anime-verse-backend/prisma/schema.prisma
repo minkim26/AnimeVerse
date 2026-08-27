@@ -15,6 +15,13 @@ model User {
     email              String          @unique
     avatarUrl          String?
     avatarThumbnailUrl String?
+    // The signup provider's own picture (Google photo, GitHub avatar, or
+    // Auth0's Gravatar-style default for email+password) — set once at
+    // account creation, shown by the frontend only until avatarUrl is set
+    // by a real upload. Deliberately outside the avatarUrl/avatarThumbnailUrl
+    // pair: those two have async thumbnail-pipeline semantics (see
+    // POST /avatar) that don't apply here.
+    providerAvatarUrl  String?
     createdAt          DateTime        @default(now())
     preferences        Preference?
     watchlist          WatchlistItem[]

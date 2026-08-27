@@ -5,6 +5,7 @@ export interface User {
   email: string
   avatarUrl: string | null
   avatarThumbnailUrl: string | null
+  providerAvatarUrl: string | null
   createdAt: string
 }
 

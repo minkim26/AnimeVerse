@@ -47,7 +47,7 @@ function AvatarUpload({ user, onUploaded, onThumbnailReady }: AvatarUploadProps)
     return pollForThumbnail(getCurrentUser, onThumbnailReady)
   }, [isGeneratingThumbnail, onThumbnailReady])
 
-  const displayImage = user.avatarThumbnailUrl ?? user.avatarUrl
+  const displayImage = user.avatarThumbnailUrl ?? user.avatarUrl ?? user.providerAvatarUrl
 
   return (
     <section className="col-span-6 surface-card p-6 sm:p-8">
@@ -92,7 +92,11 @@ function PreferencesSummary() {
   }, [])
 
   return (
-    <section className="col-span-6 md:col-span-3 surface-card p-6 sm:p-8 flex flex-col">
+    // Was col-span-3, paired with a since-removed PasswordForm card (Auth0
+    // owns password management now). Full width keeps the grid's column
+    // math clean so Title/Quote/RandomAnime still form one complete row of
+    // three below, instead of one of them getting bumped up next to this.
+    <section className="col-span-6 surface-card p-6 sm:p-8 flex flex-col">
       <h2 className="font-display text-xl font-semibold tracking-tight mb-4 text-[var(--color-ink)]">
         Current Preferences
       </h2>
@@ -305,9 +309,9 @@ export default function Profile() {
 
         {user ? (
           <div className="dark-card flex items-center gap-5 p-6 sm:p-8 mb-8">
-            {(user.avatarThumbnailUrl ?? user.avatarUrl) && (
+            {(user.avatarThumbnailUrl ?? user.avatarUrl ?? user.providerAvatarUrl) && (
               <img
-                src={user.avatarThumbnailUrl ?? user.avatarUrl ?? undefined}
+                src={user.avatarThumbnailUrl ?? user.avatarUrl ?? user.providerAvatarUrl ?? undefined}
                 alt="Your avatar"
                 className="w-16 h-16 rounded-full object-cover shrink-0"
               />

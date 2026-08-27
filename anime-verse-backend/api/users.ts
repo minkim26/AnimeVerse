@@ -2,7 +2,14 @@ import { Router } from 'express'
 
 import prisma from '../lib/prisma.ts'
 import { Prisma } from '../generated/prisma/client.ts'
-import { checkJwt, requireAuth, EMAIL_CLAIM, EMAIL_VERIFIED_CLAIM, type AuthenticatedRequest } from '../lib/auth.ts'
+import {
+    checkJwt,
+    requireAuth,
+    EMAIL_CLAIM,
+    EMAIL_VERIFIED_CLAIM,
+    PICTURE_CLAIM,
+    type AuthenticatedRequest
+} from '../lib/auth.ts'
 import {
     getJSON,
     setJSON,
@@ -65,6 +72,7 @@ router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
     const sub = req.auth!.payload.sub as string
     const email = req.auth!.payload[EMAIL_CLAIM] as string | undefined
     const emailVerified = req.auth!.payload[EMAIL_VERIFIED_CLAIM]
+    const picture = req.auth!.payload[PICTURE_CLAIM] as string | undefined
 
     if (!email) {
         return res.status(400).send({ error: 'Auth0 token is missing the email claim' })
@@ -92,7 +100,12 @@ router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
     }
 
     try {
-        const user = await prisma.user.create({ data: { auth0Id: sub, email } })
+        // providerAvatarUrl is set once, here, from whatever picture the
+        // signup provider returned — not touched again after this. A real
+        // upload (POST /avatar) sets avatarUrl instead, which the frontend
+        // already prefers over this field, so it naturally stops being
+        // shown the moment the user picks their own picture.
+        const user = await prisma.user.create({ data: { auth0Id: sub, email, providerAvatarUrl: picture ?? null } })
         res.status(201).send(withoutAuth0Id(user))
     } catch (err) {
         // Two concurrent first-syncs for the same identity (e.g. two tabs)
@@ -158,6 +171,7 @@ router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
  *                 email: { type: string }
  *                 avatarUrl: { type: string, nullable: true }
  *                 avatarThumbnailUrl: { type: string, nullable: true, description: 'Populated once consumer.ts finishes generating it; null right after upload' }
+ *                 providerAvatarUrl: { type: string, nullable: true, description: 'The signup provider picture, set once at account creation. Frontend shows it only when avatarUrl is unset.' }
  *                 createdAt: { type: string, format: date-time }
  *       401:
  *         description: Missing or invalid token

@@ -3,9 +3,36 @@ import { Router } from 'express'
 import prisma from '../lib/prisma.ts'
 import { Prisma } from '../generated/prisma/client.ts'
 import { checkJwt, requireAuth, EMAIL_CLAIM, EMAIL_VERIFIED_CLAIM, type AuthenticatedRequest } from '../lib/auth.ts'
-import { getJSON, setJSON, userCacheKey, withoutAuth0Id, USER_CACHE_TTL_SECONDS } from '../lib/cache.ts'
+import {
+    getJSON,
+    setJSON,
+    invalidate,
+    userCacheKey,
+    preferencesCacheKey,
+    withoutAuth0Id,
+    USER_CACHE_TTL_SECONDS
+} from '../lib/cache.ts'
 
 const router = Router()
+
+/*
+ * Auth0's `sub` claim is always `<connection>|<external-id>` for every
+ * connection type this tenant has enabled — the prefix alone tells us which
+ * provider an existing row is signed in with, no Auth0 API call needed.
+ */
+function signInMethodLabel(auth0Id: string): string {
+    const provider = auth0Id.split('|')[0]
+    switch (provider) {
+        case 'auth0':
+            return 'your email and password'
+        case 'google-oauth2':
+            return 'Google'
+        case 'github':
+            return 'GitHub'
+        default:
+            return 'a different sign-in method'
+    }
+}
 
 /*
  * POST /users/sync — called once by the frontend right after Auth0 login.
@@ -87,6 +114,18 @@ router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
             // (Global Constraints) — no cross-provider account linking — but
             // that should be a clear, specific rejection, not a generic error
             // that falls through to app.ts's catch-all P2002 handler.
+            //
+            // Naming the actual provider is only safe once emailVerified is
+            // true: the caller has then proven they own this mailbox, so
+            // telling them which provider it's registered under just saves a
+            // guess. An unverified claimant hasn't proven that, so revealing
+            // which provider a given email uses would let them probe
+            // arbitrary addresses to see which ones are registered here.
+            if (emailVerified === true) {
+                const conflicting = await prisma.user.findUnique({ where: { email } })
+                const method = conflicting?.auth0Id ? signInMethodLabel(conflicting.auth0Id) : 'a different sign-in method'
+                return res.status(409).send({ error: `An account with this email already exists. Sign in with ${method} instead.` })
+            }
             return res
                 .status(409)
                 .send({ error: 'An account with this email already exists. Sign in with the method you used before.' })
@@ -140,6 +179,37 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
     const sanitized = withoutAuth0Id(user)
     await setJSON(cacheKey, sanitized, USER_CACHE_TTL_SECONDS)
     res.status(200).send(sanitized)
+})
+
+/*
+ * DELETE /users/me — permanently deletes the caller's account. Preference,
+ * WatchlistItem, Review, and Swipe all cascade via the schema's own
+ * onDelete: Cascade, so this one delete is enough to remove everything.
+ * Only removes the local row — the underlying Auth0 identity isn't touched
+ * (that needs Auth0's Management API, not set up here), so logging in again
+ * with the same provider just provisions a fresh account. That's also the
+ * escape hatch for the email-already-exists 409 above: deleting the old
+ * account frees its email for a different provider to sync with.
+ */
+/**
+ * @openapi
+ * /users/me:
+ *   delete:
+ *     tags: [Users]
+ *     summary: Permanently delete the authenticated user's account
+ *     description: Deletes the User row and everything that references it. Does not revoke the underlying Auth0 identity — logging in again with the same provider provisions a fresh account.
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       204:
+ *         description: Deleted
+ *       401:
+ *         description: Missing or invalid token
+ */
+router.delete('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
+    await prisma.user.delete({ where: { id: req.user!.id } })
+    await invalidate(userCacheKey(req.user!.id))
+    await invalidate(preferencesCacheKey(req.user!.id))
+    res.status(204).send()
 })
 
 export default router

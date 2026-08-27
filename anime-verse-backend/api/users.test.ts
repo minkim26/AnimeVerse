@@ -96,10 +96,41 @@ describe('POST /users/sync', () => {
         const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(409)
-        expect(res.body.error).toBe('An account with this email already exists. Sign in with the method you used before.')
+        // createTestUser signs subjects as `test|<uuid>` — an unrecognized
+        // provider prefix, so this exercises the generic-label fallback.
+        // The named-provider cases are covered below.
+        expect(res.body.error).toBe('An account with this email already exists. Sign in with a different sign-in method instead.')
         const unchanged = await prisma.user.findUniqueOrThrow({ where: { id: firstUser.id } })
         expect(unchanged.email).toBe(firstUser.email)
         await firstUser.cleanup()
+    })
+
+    it.each([
+        ['google-oauth2|1234', 'Google'],
+        ['github|1234', 'GitHub'],
+        ['auth0|1234', 'your email and password']
+    ])('names the existing account\'s sign-in method (%s -> %s) when the claimant\'s email is verified', async (existingSub, expectedMethod) => {
+        const email = uniqueEmail()
+        const existingUser = await prisma.user.create({ data: { email, auth0Id: existingSub } })
+        const token = signToken({ [EMAIL_CLAIM]: email, [EMAIL_VERIFIED_CLAIM]: true }, { subject: 'test|a-second-provider' })
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(409)
+        expect(res.body.error).toBe(`An account with this email already exists. Sign in with ${expectedMethod} instead.`)
+        await prisma.user.delete({ where: { id: existingUser.id } })
+    })
+
+    it('does not name the existing account\'s sign-in method when the claimant\'s email is unverified', async () => {
+        const email = uniqueEmail()
+        const existingUser = await prisma.user.create({ data: { email, auth0Id: 'google-oauth2|1234' } })
+        const token = signToken({ [EMAIL_CLAIM]: email, [EMAIL_VERIFIED_CLAIM]: false }, { subject: 'test|an-unverified-claimant' })
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(409)
+        expect(res.body.error).toBe('An account with this email already exists. Sign in with the method you used before.')
+        await prisma.user.delete({ where: { id: existingUser.id } })
     })
 
     it('rejects a token with no email claim', async () => {
@@ -197,5 +228,39 @@ describe('GET /users/me', () => {
         const res = await request(app).get('/users/me').set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(404)
+    })
+})
+
+describe('DELETE /users/me', () => {
+    it("deletes the caller's account", async () => {
+        const user = await createTestUser(app)
+
+        const res = await request(app).delete('/users/me').set('Authorization', `Bearer ${user.token}`)
+
+        expect(res.status).toBe(204)
+        const deleted = await prisma.user.findUnique({ where: { id: user.id } })
+        expect(deleted).toBeNull()
+    })
+
+    it('requires authentication', async () => {
+        const res = await request(app).delete('/users/me')
+        expect(res.status).toBe(401)
+    })
+
+    // The actual motivation for this route: deleting the old account frees
+    // its email so a different provider can sync with it afterward, instead
+    // of hitting the 409 above forever.
+    it('frees the email for a different identity to sync with afterward', async () => {
+        const user = await createTestUser(app)
+        await request(app).delete('/users/me').set('Authorization', `Bearer ${user.token}`)
+
+        const newToken = signToken(
+            { [EMAIL_CLAIM]: user.email, [EMAIL_VERIFIED_CLAIM]: true },
+            { subject: 'test|a-fresh-identity' }
+        )
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${newToken}`)
+
+        expect(res.status).toBe(201)
+        await prisma.user.delete({ where: { email: user.email } })
     })
 })

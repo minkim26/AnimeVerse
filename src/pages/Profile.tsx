@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { useAuth0 } from '@auth0/auth0-react'
 import Navbar from '../components/Navbar.tsx'
 import Footer from '../components/Footer.tsx'
-import { getCurrentUser, type User } from '../services/auth.ts'
+import { getCurrentUser, deleteAccount, type User } from '../services/auth.ts'
 import { ApiError } from '../services/api.ts'
 import { getPreferences } from '../services/preferences.ts'
 import { getRandomQuote, type Quote } from '../services/quotes.ts'
@@ -250,6 +250,7 @@ export default function Profile() {
     description: "Manage your AnimeVerse account and avatar, and revisit anime you've swiped on.",
   })
   const [user, setUser] = useState<User | null>(null)
+  const [deleteError, setDeleteError] = useState('')
   const { logout } = useAuth0()
 
   useEffect(() => {
@@ -266,6 +267,21 @@ export default function Profile() {
 
   function handleLogout() {
     logout({ logoutParams: { returnTo: window.location.origin } })
+  }
+
+  async function handleDeleteAccount() {
+    const confirmed = window.confirm(
+      'Are you sure you want to permanently delete your account? This removes your profile, preferences, watchlist, reviews, and swipe history. This cannot be undone.',
+    )
+    if (!confirmed) return
+
+    setDeleteError('')
+    try {
+      await deleteAccount()
+      logout({ logoutParams: { returnTo: window.location.origin } })
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : 'Failed to delete your account. Please try again.')
+    }
   }
 
   return (
@@ -318,6 +334,17 @@ export default function Profile() {
           <TitleGenerator />
           <QuoteGenerator />
           <RandomAnimeGenerator />
+        </div>
+
+        <div className="mt-10">
+          <button
+            type="button"
+            onClick={handleDeleteAccount}
+            className="text-xs text-[var(--color-error)] underline bg-transparent border-none p-0 cursor-pointer"
+          >
+            Delete Account
+          </button>
+          {deleteError && <p className="text-xs text-[var(--color-error)] mt-2">{deleteError}</p>}
         </div>
       </main>
 

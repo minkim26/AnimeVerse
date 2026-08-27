@@ -13,18 +13,6 @@ export function requiredEnv(name: string): string {
 // the actual rendered page (Auth0 occasionally changes markup between
 // login-experience versions) and adjust the selectors below.
 export async function loginViaAuth0(page: Page, email: string, password: string): Promise<void> {
-  // TEMPORARY diagnostic — remove once the post-login session drop is root-caused.
-  page.on('console', (msg) => console.log(`[browser console] ${msg.type()}: ${msg.text()}`))
-  page.on('pageerror', (err) => console.log(`[browser pageerror] ${err.message}`))
-  page.on('response', (res) => {
-    if (res.url().includes('/users/sync')) {
-      res
-        .text()
-        .then((body) => console.log(`[sync response] ${res.status()} ${body}`))
-        .catch(() => {})
-    }
-  })
-
   await page.goto('/login')
   await page.getByRole('button', { name: 'Log In' }).click()
   await page.waitForURL(/\.auth0\.com\/u\/login/)
@@ -35,6 +23,12 @@ export async function loginViaAuth0(page: Page, email: string, password: string)
   // username/password submit button specifically.
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.waitForURL('**/profile')
+  // The URL changes to /profile as soon as onRedirectCallback navigates,
+  // which happens before Auth0SyncGate's POST /users/sync has resolved —
+  // it renders nothing until sync completes. Waiting only for the URL lets
+  // a caller's next page.goto() fire while that sync request is still
+  // in-flight, aborting it. This heading only renders once the gate opens.
+  await page.getByRole('heading', { name: 'Profile', exact: true }).waitFor()
 }
 
 // Gets a logged-in session past the RequireOnboarding gate, regardless of

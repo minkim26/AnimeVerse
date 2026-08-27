@@ -168,6 +168,13 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
 
+      # TEMPORARY — the health check above only prints this on startup
+      # failure, not a crash mid-run. Remove once the post-login backend
+      # connectivity issue is root-caused.
+      - name: Show backend log
+        if: always()
+        run: cat /tmp/backend.log
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v5

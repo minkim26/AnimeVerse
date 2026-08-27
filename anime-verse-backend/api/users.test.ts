@@ -60,8 +60,9 @@ describe('POST /users/sync', () => {
      * claimant sharing a pre-migration row's email can't link (security
      * requirement) and also can't fall back to creating a second row with
      * that same email — the create() collides on the unique constraint and
-     * 400s. The attacker's sync attempt simply fails; the pre-migration row
-     * stays unlinked (auth0Id still null) either way.
+     * gets the same 409 as any other email conflict. The attacker's sync
+     * attempt simply fails; the pre-migration row stays unlinked (auth0Id
+     * still null) either way.
      */
     it('does not link a pre-migration row when the email is not verified', async () => {
         const email = uniqueEmail()
@@ -70,10 +71,35 @@ describe('POST /users/sync', () => {
 
         const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
 
-        expect(res.status).toBe(400)
+        expect(res.status).toBe(409)
         const unchanged = await prisma.user.findUniqueOrThrow({ where: { id: preMigrationUser.id } })
         expect(unchanged.auth0Id).toBeNull()
         await prisma.user.delete({ where: { id: preMigrationUser.id } })
+    })
+
+    /*
+     * The scenario that actually surfaced this: the same person signs in
+     * with one provider (creating a User row linked to that auth0Id), then
+     * later tries a different provider using the same, verified email.
+     * There's no pre-migration row here (auth0Id is already set, not null),
+     * so the linking branch above never even runs — this exercises the
+     * create()-collides-on-email path directly, with the row already fully
+     * owned by another identity rather than sitting unlinked.
+     */
+    it('returns 409 instead of creating a duplicate when the email already belongs to a different linked identity', async () => {
+        const firstUser = await createTestUser(app)
+        const token = signToken(
+            { [EMAIL_CLAIM]: firstUser.email, [EMAIL_VERIFIED_CLAIM]: true },
+            { subject: 'test|a-different-provider' }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(409)
+        expect(res.body.error).toBe('An account with this email already exists. Sign in with the method you used before.')
+        const unchanged = await prisma.user.findUniqueOrThrow({ where: { id: firstUser.id } })
+        expect(unchanged.email).toBe(firstUser.email)
+        await firstUser.cleanup()
     })
 
     it('rejects a token with no email claim', async () => {

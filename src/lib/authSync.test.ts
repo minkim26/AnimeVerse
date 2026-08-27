@@ -8,10 +8,14 @@ describe('syncErrorMessage', () => {
     expect(message).toMatch(/share an email address/)
   })
 
-  it('falls back to a generic message for any other failure', () => {
-    expect(syncErrorMessage(new ApiError(500, 'Internal Server Error'))).toBe(
-      'Something went wrong finishing your login. Please try again.'
+  it('shows the backend message as-is for a known ApiError that is not the missing-email case', () => {
+    const message = syncErrorMessage(
+      new ApiError(409, 'An account with this email already exists. Sign in with the method you used before.')
     )
+    expect(message).toBe('An account with this email already exists. Sign in with the method you used before.')
+  })
+
+  it('falls back to a generic message for a non-ApiError failure', () => {
     expect(syncErrorMessage(new TypeError('Failed to fetch'))).toBe(
       'Something went wrong finishing your login. Please try again.'
     )

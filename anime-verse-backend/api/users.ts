@@ -31,6 +31,8 @@ const router = Router()
  *         description: The Auth0 token is missing the email claim (see the Post-Login Action in Auth0's dashboard)
  *       401:
  *         description: Missing or invalid token
+ *       409:
+ *         description: This email already belongs to a different Auth0 identity (no cross-provider account linking)
  */
 router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
     const sub = req.auth!.payload.sub as string
@@ -77,6 +79,17 @@ router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
             if (raced) {
                 return res.status(200).send(withoutAuth0Id(raced))
             }
+            // create() only sets auth0Id and email, so if the constraint that
+            // fired wasn't auth0Id (checked above), it was email: some other
+            // identity already owns this address — a different sign-in
+            // provider, or a pre-migration row this claimant's unverified
+            // email wasn't allowed to link above. email stays @unique on User
+            // (Global Constraints) — no cross-provider account linking — but
+            // that should be a clear, specific rejection, not a generic error
+            // that falls through to app.ts's catch-all P2002 handler.
+            return res
+                .status(409)
+                .send({ error: 'An account with this email already exists. Sign in with the method you used before.' })
         }
         throw err
     }

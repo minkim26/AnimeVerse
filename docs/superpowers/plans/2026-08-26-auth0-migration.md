@@ -12,7 +12,7 @@
 1. **Env var names**: the spec says `AUTH0_ISSUER_BASE_URL`; this plan uses `ISSUER_BASE_URL` (no prefix) because that's the literal name `express-oauth2-jwt-bearer` auto-reads from the environment — `AUTH0_ISSUER_BASE_URL` would silently never be read.
 2. **`jsonwebtoken` stays as a devDependency**, not fully removed — it mints test-only HS256 tokens (see Task 2's testing strategy). No production code imports it.
 3. **A stripped-response helper survives**, renamed from `withoutPassword` to `withoutAuth0Id` — `auth0Id` isn't secret, but it's an internal identity detail the API's response shape shouldn't leak, matching the spec's own instinct even though the spec said to delete the helper outright.
-4. **Route tests use an HS256 shared-secret bypass, not module-mocking.** The spec's Testing Approach suggested mocking `express-oauth2-jwt-bearer`'s `auth()` at the module level. This plan instead makes `checkJwt`'s signing algorithm swap to HS256 when `AUTH0_TEST_SIGNING_SECRET` is set (a first-class config option the library already supports), so tests exercise the exact same verification code path production does — just with a different key — instead of a hand-rolled mock standing in for it. See Task 2, Step 5. The HS256 branch passes `issuer`/`audience` explicitly rather than falling through to `auth()`'s own `ISSUER_BASE_URL`/`AUDIENCE` env-var auto-detection: the library runs real OIDC discovery (a network fetch) whenever `issuerBaseURL` is set, regardless of whether `secret` is also set, and only skips it when configured with `issuer` instead. Confirmed against the installed library's source and with a standalone spike before writing Task 2's steps — this is what makes the whole test suite runnable offline.
+4. **Route tests use an HS256 shared-secret bypass, not module-mocking.** The spec's Testing Approach suggested mocking `express-oauth2-jwt-bearer`'s `auth()` at the module level. This plan instead makes `checkJwt`'s signing algorithm swap to HS256 when `AUTH0_TEST_SIGNING_SECRET` is set (a first-class config option the library already supports), so tests exercise the exact same verification code path production does — just with a different key — instead of a hand-rolled mock standing in for it. See Task 2, Step 5. The HS256 branch also passes an explicit `issuerBaseURL: ''` alongside `issuer`/`audience`. Passing `issuer` alone is not enough: `auth()`'s options destructure as `{ issuerBaseURL = process.env.ISSUER_BASE_URL, ... }`, so if `issuerBaseURL` is left out of the options object entirely, that default still pulls it back in from the environment (`ISSUER_BASE_URL` is set for this same HS256 branch to read as `issuer`) and triggers real OIDC discovery, a network fetch, regardless of what `issuer` is set to. Only the explicit falsy `issuerBaseURL: ''` makes the library skip discovery and verify locally against `issuer`/`secret`. Confirmed against the installed library's source and with a standalone spike before writing Task 2's steps — this is what makes the whole test suite runnable offline.
 
 ## Global Constraints
 
@@ -57,7 +57,7 @@ Sign up / log in at https://manage.auth0.com. Create an application: **Applicati
 
 Back in the SPA application's settings, add to **all four** of Allowed Callback URLs, Allowed Logout URLs, Allowed Web Origins, and Allowed Origins (CORS):
 ```
-http://localhost:5173,https://animeverse.minkim26.tech
+http://localhost:5173,http://localhost:5174,https://animeverse.minkim26.tech
 ```
 
 - [ ] **Step 4: Enable Google and GitHub social connections**
@@ -163,8 +163,10 @@ AUDIENCE=https://your-api-identifier
 
 # Test-only. When set, lib/auth.ts verifies tokens with this shared HS256
 # secret instead of RS256-via-JWKS against a real Auth0 tenant, so tests
-# don't need network access to Auth0. MUST NEVER be set in production —
-# lib/auth.ts throws at startup if it is and NODE_ENV=production.
+# don't need network access to Auth0. MUST NEVER be set outside the test
+# runner — lib/auth.ts throws at startup unless NODE_ENV=test (Vitest's own
+# default; neither Dockerfile nor compose.prod.yml ever sets NODE_ENV, so a
+# production-only check would silently never fire).
 AUTH0_TEST_SIGNING_SECRET=
 ```
 
@@ -184,30 +186,39 @@ export const EMAIL_VERIFIED_CLAIM = 'https://animeverse.app/email_verified'
  * RS256-via-JWKS to a locally-verifiable HS256 shared secret, so tests
  * (test/helpers.ts) can mint real, validly-signed tokens with no network
  * call to a real Auth0 tenant. Guarded so it can never accidentally take
- * over in production — anyone holding this value could forge a token for
- * any user if it did.
+ * over outside the test runner — anyone holding this value could forge a
+ * token for any user if it did. Checked against NODE_ENV === 'test'
+ * (Vitest's own default, never set explicitly anywhere in this repo)
+ * rather than NODE_ENV === 'production', since neither Dockerfile nor
+ * compose.prod.yml ever sets NODE_ENV — a production-only check would
+ * silently never fire.
  */
 const testSigningSecret = process.env.AUTH0_TEST_SIGNING_SECRET
-if (testSigningSecret && process.env.NODE_ENV === 'production') {
-    throw new Error('AUTH0_TEST_SIGNING_SECRET must not be set in production')
+if (testSigningSecret && process.env.NODE_ENV !== 'test') {
+    throw new Error('AUTH0_TEST_SIGNING_SECRET may only be set when NODE_ENV=test')
 }
 
 /*
- * The two branches must not share a code path here: express-oauth2-jwt-bearer
- * runs OIDC discovery (a real network fetch to <issuerBaseURL>/.well-known/
- * openid-configuration) whenever `issuerBaseURL` is set — even if `secret`
- * is also set. Passing `issuer` instead of `issuerBaseURL` is the library's
- * documented way to skip discovery for a non-standard (HS256-shared-secret)
- * setup, so the HS256 branch reads ISSUER_BASE_URL/AUDIENCE itself and
- * passes them as `issuer`/`audience` — it must NOT fall through to
- * `auth()`'s own env-var auto-detection, which reads `issuerBaseURL` and
- * would try to reach a fake/unreachable test issuer over the network.
- * Verified with a standalone spike (real express-oauth2-jwt-bearer install,
- * unresolvable issuer domain, `issuer`+`secret`+`tokenSigningAlg` config):
- * request completed locally with no network attempt.
+ * The two branches must not share a code path here: express-oauth2-jwt-bearer's
+ * own jwtVerifier destructures its options as
+ * `{ issuerBaseURL = process.env.ISSUER_BASE_URL, ... }` — that default
+ * fires whenever the `issuerBaseURL` key is *absent* from the options
+ * object, regardless of what you pass for `issuer`. Since ISSUER_BASE_URL
+ * is set in the environment (needed for both branches, and for production's
+ * own auto-detection below), simply not mentioning `issuerBaseURL` here
+ * still lets the library's default pull it back in and run OIDC discovery
+ * (a real network fetch to <issuerBaseURL>/.well-known/openid-configuration)
+ * — confirmed empirically: the HS256 branch below failed every test with
+ * "Failed to fetch authorization server metadata" after a ~10s timeout
+ * until `issuerBaseURL` was explicitly forced falsy. Passing `issuerBaseURL:
+ * ''` (not `undefined` — that's what the destructuring default guards
+ * against, so it wouldn't override anything) makes `if (issuerBaseURL)`
+ * false in the library's source, skipping discovery and going straight to
+ * local verification with `issuer`/`secret`/`tokenSigningAlg`.
  */
 export const checkJwt = testSigningSecret
     ? auth({
+          issuerBaseURL: '',
           issuer: process.env.ISSUER_BASE_URL,
           audience: process.env.AUDIENCE,
           secret: testSigningSecret,
@@ -727,10 +738,14 @@ interface Auth0SyncGateProps {
  * rendering while isAuthenticated is true and sync hasn't finished yet —
  * an anonymous visitor (or a page load before Auth0 has decided whether a
  * session exists) renders children immediately, so public pages never
- * wait on Auth0 at all.
+ * wait on Auth0 at all. Any sync failure logs the user out rather than
+ * opening the gate: a 5xx used to be tolerated as "probably transient,"
+ * but that left `synced` permanently true with no local User row ever
+ * created, so every protected route 404'd until a manual reload. Logging
+ * out and letting them log back in is a smaller failure than that.
  */
 export default function Auth0SyncGate({ children }: Auth0SyncGateProps) {
-  const { isAuthenticated, getAccessTokenSilently } = useAuth0()
+  const { isAuthenticated, getAccessTokenSilently, logout } = useAuth0()
   const [synced, setSynced] = useState(false)
   const syncedForRef = useRef<boolean | null>(null)
 
@@ -751,9 +766,9 @@ export default function Auth0SyncGate({ children }: Auth0SyncGateProps) {
       .then(() => setSynced(true))
       .catch((err) => {
         console.error('[Auth0SyncGate] Failed to sync user:', err)
-        setSynced(true) // don't block forever on a transient failure; the next authenticated call will surface the real error
+        logout({ logoutParams: { returnTo: window.location.origin } })
       })
-  }, [isAuthenticated])
+  }, [isAuthenticated, logout])
 
   if (isAuthenticated && !synced) {
     return null

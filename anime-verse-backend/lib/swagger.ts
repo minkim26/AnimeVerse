@@ -15,7 +15,12 @@ const spec = swaggerJSDoc({
         },
         components: {
             securitySchemes: {
-                bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                    description: 'An Auth0-issued access token (see POST /users/sync), not a self-issued one.'
+                },
                 cronSecret: { type: 'apiKey', in: 'header', name: 'X-Cron-Secret' }
             }
         }

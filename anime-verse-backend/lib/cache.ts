@@ -9,13 +9,13 @@ export function userCacheKey(userId: number): string {
 }
 
 /*
- * withoutPassword — the one place that decides what a "user" object looks
+ * withoutAuth0Id — the one place that decides what a "user" object looks
  * like once it leaves this app, whether headed for an HTTP response or a
- * Redis cache entry. Every call site that could otherwise cache or return
- * a password hash routes through this instead of destructuring inline.
+ * Redis cache entry. auth0Id isn't secret, but it's an internal identity
+ * detail this API's response shape shouldn't expose.
  */
-export function withoutPassword<T extends { password: unknown }>(user: T): Omit<T, 'password'> {
-    const { password, ...rest } = user
+export function withoutAuth0Id<T extends { auth0Id: unknown }>(user: T): Omit<T, 'auth0Id'> {
+    const { auth0Id, ...rest } = user
     return rest
 }
 

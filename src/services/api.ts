@@ -9,16 +9,13 @@ export class ApiError extends Error {
   }
 }
 
-export function getToken(): string | null {
-  return localStorage.getItem('token')
-}
+let tokenGetter: (() => Promise<string>) | null = null
 
-export function setToken(token: string): void {
-  localStorage.setItem('token', token)
-}
-
-export function clearToken(): void {
-  localStorage.removeItem('token')
+// Registered once by Auth0SyncGate, since getAccessTokenSilently is only
+// reachable via the useAuth0() hook, but apiRequest is a plain function
+// called from services/*.ts files with no component tree of their own.
+export function setAccessTokenGetter(fn: () => Promise<string>): void {
+  tokenGetter = fn
 }
 
 interface RequestOptions {
@@ -39,10 +36,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     headers['Content-Type'] = 'application/json'
   }
   if (auth) {
-    const token = getToken()
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
+    if (!tokenGetter) {
+      throw new Error('Auth0 is not initialized yet')
     }
+    headers.Authorization = `Bearer ${await tokenGetter()}`
   }
 
   const response = await fetch(`${API_URL}${path}`, {

@@ -12,6 +12,9 @@ node_modules/
 .env.production
 .env.testing
 
+# Auth0 production migration export (contains bcrypt hashes, never commit)
+anime-verse-backend/users-import.json
+
 # Local Docker Compose overrides (dev-machine-specific, never shipped)
 compose.override.yml
 

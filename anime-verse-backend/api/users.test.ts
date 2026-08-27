@@ -1,93 +1,175 @@
 import { describe, it, expect } from 'vitest'
 import request from 'supertest'
+import jwt from 'jsonwebtoken'
 
 import app from '../app.ts'
 import prisma from '../lib/prisma.ts'
+import { EMAIL_CLAIM, EMAIL_VERIFIED_CLAIM } from '../lib/auth.ts'
 import { createTestUser } from '../test/helpers.ts'
 
 function uniqueEmail(): string {
     return `test-${Math.random().toString(36).slice(2)}@example.com`
 }
 
-describe('POST /users', () => {
-    it('creates a user with a valid email and password', async () => {
-        const email = uniqueEmail()
+function signToken(payload: Record<string, unknown>, options: jwt.SignOptions = {}): string {
+    return jwt.sign(payload, process.env.AUTH0_TEST_SIGNING_SECRET!, {
+        algorithm: 'HS256',
+        issuer: process.env.ISSUER_BASE_URL,
+        audience: process.env.AUDIENCE,
+        expiresIn: '1h',
+        ...options
+    })
+}
 
-        const res = await request(app).post('/users').send({ email, password: 'a-real-password' })
+describe('POST /users/sync', () => {
+    it('creates a new user on first sync', async () => {
+        const email = uniqueEmail()
+        const token = signToken({ [EMAIL_CLAIM]: email, [EMAIL_VERIFIED_CLAIM]: true }, { subject: `test|${email}` })
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(201)
+        expect(res.body.email).toBe(email)
         await prisma.user.delete({ where: { email } })
     })
 
-    /*
-     * Signup, unlike login, benefits from telling the user exactly what's
-     * wrong with their input — there's no credential-enumeration risk in
-     * validation-format feedback here. This also proves app.ts's error
-     * handler no longer leaks Zod's CLI-style prettified format (bullet
-     * points, "at <path>" arrows) — just the plain custom message.
-     */
-    it('rejects a password under 8 characters with a plain, human-readable message', async () => {
-        const res = await request(app).post('/users').send({ email: uniqueEmail(), password: 'short' })
+    it('is idempotent: syncing the same identity twice returns the same user', async () => {
+        const user = await createTestUser(app)
 
-        expect(res.status).toBe(400)
-        expect(res.body.error).toBe('Password must be at least 8 characters.')
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${user.token}`)
+
+        expect(res.status).toBe(200)
+        expect(res.body.id).toBe(user.id)
+        await user.cleanup()
     })
 
-    it('rejects a malformed email with a plain, human-readable message', async () => {
-        const res = await request(app).post('/users').send({ email: 'not-an-email', password: 'a-real-password' })
+    it('links a pre-migration row (auth0Id null) by verified email instead of creating a duplicate', async () => {
+        const email = uniqueEmail()
+        const preMigrationUser = await prisma.user.create({ data: { email, auth0Id: null } })
+        const token = signToken({ [EMAIL_CLAIM]: email, [EMAIL_VERIFIED_CLAIM]: true }, { subject: 'test|new-auth0-identity' })
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(200)
+        expect(res.body.id).toBe(preMigrationUser.id)
+        await prisma.user.delete({ where: { id: preMigrationUser.id } })
+    })
+
+    /*
+     * email stays @unique on User (Global Constraints), so an unverified
+     * claimant sharing a pre-migration row's email can't link (security
+     * requirement) and also can't fall back to creating a second row with
+     * that same email — the create() collides on the unique constraint and
+     * 400s. The attacker's sync attempt simply fails; the pre-migration row
+     * stays unlinked (auth0Id still null) either way.
+     */
+    it('does not link a pre-migration row when the email is not verified', async () => {
+        const email = uniqueEmail()
+        const preMigrationUser = await prisma.user.create({ data: { email, auth0Id: null } })
+        const token = signToken({ [EMAIL_CLAIM]: email, [EMAIL_VERIFIED_CLAIM]: false }, { subject: 'test|attacker-identity' })
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
 
         expect(res.status).toBe(400)
-        expect(res.body.error).toBe('Please enter a valid email address.')
+        const unchanged = await prisma.user.findUniqueOrThrow({ where: { id: preMigrationUser.id } })
+        expect(unchanged.auth0Id).toBeNull()
+        await prisma.user.delete({ where: { id: preMigrationUser.id } })
+    })
+
+    it('rejects a token with no email claim', async () => {
+        const token = signToken({}, { subject: 'test|no-email' })
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(400)
+    })
+
+    it('requires authentication', async () => {
+        const res = await request(app).post('/users/sync')
+        expect(res.status).toBe(401)
+    })
+
+    it('rejects a token signed with the wrong secret', async () => {
+        const token = jwt.sign(
+            { [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true },
+            'a-completely-different-secret',
+            {
+                subject: 'test|wrong-signature',
+                algorithm: 'HS256',
+                issuer: process.env.ISSUER_BASE_URL,
+                audience: process.env.AUDIENCE,
+                expiresIn: '1h'
+            }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(401)
+    })
+
+    it('rejects a token with the wrong audience', async () => {
+        const token = signToken(
+            { [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true },
+            { subject: 'test|wrong-audience', audience: 'https://not-the-right-audience' }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(401)
+    })
+
+    it('rejects a token with the wrong issuer', async () => {
+        const token = signToken(
+            { [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true },
+            { subject: 'test|wrong-issuer', issuer: 'https://not-the-right-issuer.example.com/' }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(401)
+    })
+
+    it('rejects an expired token', async () => {
+        // A negative expiresIn produces an exp already in the past, without
+        // setting payload.exp directly alongside it — jsonwebtoken's sign()
+        // throws if both options.expiresIn and payload.exp are present
+        // (confirmed empirically), and signToken's default options always
+        // carry an expiresIn key, so overriding it here (rather than adding
+        // a separate exp claim) is what actually keeps this a single,
+        // unambiguous expiration source.
+        const token = signToken(
+            { [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true },
+            { subject: 'test|expired', expiresIn: -3600 }
+        )
+
+        const res = await request(app).post('/users/sync').set('Authorization', `Bearer ${token}`)
+
+        expect(res.status).toBe(401)
     })
 })
 
-describe('POST /users/login', () => {
-    it('logs in with correct credentials', async () => {
+describe('GET /users/me', () => {
+    it("returns the caller's profile without leaking auth0Id", async () => {
         const user = await createTestUser(app)
 
-        const res = await request(app).post('/users/login').send({ email: user.email, password: 'test-password-123' })
+        const res = await request(app).get('/users/me').set('Authorization', `Bearer ${user.token}`)
 
         expect(res.status).toBe(200)
-        expect(res.body.token).toBeDefined()
+        expect(res.body.email).toBe(user.email)
+        expect(res.body.auth0Id).toBeUndefined()
         await user.cleanup()
     })
 
-    it('rejects a wrong password with a generic message', async () => {
-        const user = await createTestUser(app)
-
-        const res = await request(app).post('/users/login').send({ email: user.email, password: 'wrong-password' })
-
+    it('requires authentication', async () => {
+        const res = await request(app).get('/users/me')
         expect(res.status).toBe(401)
-        expect(res.body.error).toBe('Invalid credentials')
-        await user.cleanup()
     })
 
-    it('rejects a non-existent email with the same generic message', async () => {
-        const res = await request(app).post('/users/login').send({ email: uniqueEmail(), password: 'whatever-password' })
+    it('returns 404 for a validly-signed token whose subject never called /users/sync', async () => {
+        const token = signToken({ [EMAIL_CLAIM]: uniqueEmail(), [EMAIL_VERIFIED_CLAIM]: true }, { subject: 'test|never-synced' })
 
-        expect(res.status).toBe(401)
-        expect(res.body.error).toBe('Invalid credentials')
-    })
+        const res = await request(app).get('/users/me').set('Authorization', `Bearer ${token}`)
 
-    /*
-     * The security-relevant case: a malformed request body (password too
-     * short to ever be a real account's password) must produce the exact
-     * same response as any other login failure — same status, same
-     * message. Never the format-specific Zod message signup shows, which
-     * would let an attacker distinguish "your input failed validation"
-     * from "your credentials are simply wrong".
-     */
-    it('rejects a password under 8 characters with the same generic message as wrong credentials, not a validation-specific one', async () => {
-        const res = await request(app).post('/users/login').send({ email: uniqueEmail(), password: 'short' })
-
-        expect(res.status).toBe(401)
-        expect(res.body.error).toBe('Invalid credentials')
-    })
-
-    it('rejects a malformed email the same way', async () => {
-        const res = await request(app).post('/users/login').send({ email: 'not-an-email', password: 'whatever-password' })
-
-        expect(res.status).toBe(401)
-        expect(res.body.error).toBe('Invalid credentials')
+        expect(res.status).toBe(404)
     })
 })

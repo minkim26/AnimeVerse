@@ -1,110 +1,94 @@
-import jwt from 'jsonwebtoken'
-import dotenv from 'dotenv'
-import type { Request, Response, NextFunction } from 'express'
+import { auth } from 'express-oauth2-jwt-bearer'
+import type { Request, Response, NextFunction, RequestHandler } from 'express'
 
-import redis from './redis.ts'
+import prisma from './prisma.ts'
 
-// Load .env.local so JWT_SECRET is available when running outside Docker
-dotenv.config({ path: '.env.local' })
+export const EMAIL_CLAIM = 'https://animeverse.app/email'
+export const EMAIL_VERIFIED_CLAIM = 'https://animeverse.app/email_verified'
 
-// HS256 is only as strong as the key. Below ~32 bytes it becomes
-// offline-brute-forceable from a single captured token, so fail loud at
-// startup rather than silently signing with a weak secret.
-const MIN_JWT_SECRET_LENGTH = 32
-function requireJwtSecret(): string {
-    const secret = process.env.JWT_SECRET
-    if (!secret || secret.length < MIN_JWT_SECRET_LENGTH) {
-        throw new Error(`JWT_SECRET must be set and at least ${MIN_JWT_SECRET_LENGTH} characters long`)
-    }
-    return secret
+/*
+ * AUTH0_TEST_SIGNING_SECRET switches JWT verification from real Auth0
+ * RS256-via-JWKS to a locally-verifiable HS256 shared secret, so tests
+ * (test/helpers.ts) can mint real, validly-signed tokens with no network
+ * call to a real Auth0 tenant. Guarded so it can never accidentally take
+ * over outside the test runner — anyone holding this value could forge a
+ * token for any user if it did. Checked against NODE_ENV === 'test'
+ * (Vitest's own default, never set explicitly anywhere in this repo)
+ * rather than NODE_ENV === 'production', since neither Dockerfile nor
+ * compose.prod.yml ever sets NODE_ENV — a production-only check would
+ * silently never fire.
+ */
+const testSigningSecret = process.env.AUTH0_TEST_SIGNING_SECRET
+if (testSigningSecret && process.env.NODE_ENV !== 'test') {
+    throw new Error('AUTH0_TEST_SIGNING_SECRET may only be set when NODE_ENV=test')
 }
-const JWT_SECRET = requireJwtSecret()
 
-const TOKEN_LIFETIME_SECONDS = 24 * 60 * 60
+/*
+ * The two branches must not share a code path here: express-oauth2-jwt-bearer's
+ * own jwtVerifier destructures its options as
+ * `{ issuerBaseURL = process.env.ISSUER_BASE_URL, ... }` — that default
+ * fires whenever the `issuerBaseURL` key is *absent* from the options
+ * object, regardless of what you pass for `issuer`. Since ISSUER_BASE_URL
+ * is set in the environment (needed for both branches, and for production's
+ * own auto-detection below), simply not mentioning `issuerBaseURL` here
+ * still lets the library's default pull it back in and run OIDC discovery
+ * (a real network fetch to <issuerBaseURL>/.well-known/openid-configuration)
+ * — confirmed empirically: the HS256 branch below failed every test with
+ * "Failed to fetch authorization server metadata" after a ~10s timeout
+ * until `issuerBaseURL` was explicitly forced falsy. Passing `issuerBaseURL:
+ * ''` (not `undefined` — that's what the destructuring default guards
+ * against, so it wouldn't override anything) makes `if (issuerBaseURL)`
+ * false in the library's source, skipping discovery and going straight to
+ * local verification with `issuer`/`secret`/`tokenSigningAlg`.
+ */
+export const checkJwt = testSigningSecret
+    ? auth({
+          issuerBaseURL: '',
+          issuer: process.env.ISSUER_BASE_URL,
+          audience: process.env.AUDIENCE,
+          secret: testSigningSecret,
+          tokenSigningAlg: 'HS256',
+      })
+    : auth() // production: reads ISSUER_BASE_URL/AUDIENCE and does real JWKS discovery
 
+// express-oauth2-jwt-bearer already declares `req.auth` globally (typed as
+// AuthResult, payload: JWTPayload) in its own .d.ts — redeclaring it here
+// with an incompatible type would fail to compile (TS2430: interface
+// incorrectly extends Request). Only `user` is new.
 export interface AuthenticatedRequest extends Request {
     user?: { id: number }
 }
 
-interface VerifiedToken {
-    userId: number
-    issuedAt: number
-}
-
-/*
- * generateToken — creates a signed JWT for a logged-in user.
- *
- * The payload stores `sub` ("subject"), the standard JWT claim for the
- * user's ID — per JWT convention this is a string. Expiry is 24 hours —
- * after that the token is invalid and the user must log in again.
- */
-export function generateToken(userId: number): string {
-    return jwt.sign({ sub: String(userId) }, JWT_SECRET, {
-        expiresIn: TOKEN_LIFETIME_SECONDS,
-        algorithm: 'HS256'
-    })
-}
-
-/*
- * verifyToken — decodes and verifies a JWT string, returning the user ID
- * and issued-at time encoded in it. Throws if the token is expired,
- * malformed, the signature doesn't match, or the payload shape is wrong.
- */
-export function verifyToken(token: string): VerifiedToken {
-    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] })
-    if (typeof payload === 'string' || typeof payload.sub !== 'string' || typeof payload.iat !== 'number') {
-        throw new Error('Invalid token payload')
-    }
-    const userId = Number(payload.sub)
-    if (!Number.isInteger(userId)) {
-        throw new Error('Invalid token payload')
-    }
-    return { userId, issuedAt: payload.iat }
-}
-
-function revocationKey(userId: number): string {
-    return `revoke:user:${userId}`
-}
-
-/*
- * revokeTokensIssuedBefore — called after a password change so any token
- * issued before this moment is rejected by requireAuth even though it
- * hasn't expired yet. The revocation marker only needs to outlive the
- * longest-lived token that could still be in circulation, hence the same
- * TTL as TOKEN_LIFETIME_SECONDS.
- */
-export async function revokeTokensIssuedBefore(userId: number): Promise<void> {
-    await redis.set(revocationKey(userId), Math.floor(Date.now() / 1000), { EX: TOKEN_LIFETIME_SECONDS })
-}
-
-/*
- * requireAuth — Express middleware that protects routes.
- *
- * Clients send their JWT in the Authorization header:
- *   Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
- *
- * Attaches the decoded user info to req.user so route handlers can read
- * req.user.id. Returns 401 if the token is missing, malformed, expired, or
- * was issued before the user's last password change.
- */
-export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
-    const authHeader = req.headers.authorization
-
-    if (!authHeader?.startsWith('Bearer ')) {
-        res.status(401).send({ error: 'Authentication required' })
+async function resolveUser(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    const sub = req.auth!.payload.sub as string
+    const user = await prisma.user.findUnique({ where: { auth0Id: sub } })
+    if (!user) {
+        res.status(404).send({ error: 'Account not provisioned. Call POST /users/sync first.' })
         return
     }
+    req.user = { id: user.id }
+    next()
+}
 
-    try {
-        const { userId, issuedAt } = verifyToken(authHeader.slice(7))
-        const revokedAt = await redis.get(revocationKey(userId))
-        if (revokedAt && issuedAt <= Number(revokedAt)) {
-            res.status(401).send({ error: 'Invalid or expired token' })
+/*
+ * requireAuth composes checkJwt + resolveUser into ONE RequestHandler
+ * rather than exporting `[checkJwt, resolveUser]` as an array. Every
+ * existing route calls this as a single middleware argument
+ * (`router.get('/me', requireAuth, handler)`), and passing an *array* as
+ * that argument — instead of one function — pushes Express's route-handler
+ * overload resolution onto a generic-inference path it can't fully solve,
+ * which silently drops contextual typing for every handler after it in
+ * every file that imports requireAuth (surfaces as "res implicitly has an
+ * any type" scattered across unrelated route files, not here). Composing
+ * into one function keeps every call site — and the plan's own stated
+ * interface — unchanged.
+ */
+export const requireAuth: RequestHandler = (req, res, next) => {
+    checkJwt(req, res, (err?: unknown) => {
+        if (err) {
+            next(err)
             return
         }
-        req.user = { id: userId }
-        next()
-    } catch {
-        res.status(401).send({ error: 'Invalid or expired token' })
-    }
+        resolveUser(req as AuthenticatedRequest, res, next).catch(next)
+    })
 }

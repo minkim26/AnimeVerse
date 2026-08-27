@@ -20,6 +20,14 @@ permissions:
 jobs:
   update-snapshots:
     runs-on: ubuntu-latest
+    env:
+      # e2e/visual.spec.ts only ever visits public pages (Home, Login,
+      # Signup, Privacy Policy) — no real Auth0 login happens here, so
+      # these just need to be non-empty strings to satisfy main.tsx's
+      # startup check. They're never sent to Auth0.
+      VITE_AUTH0_DOMAIN: not-used.auth0.com
+      VITE_AUTH0_CLIENT_ID: not-used
+      VITE_AUTH0_AUDIENCE: not-used
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

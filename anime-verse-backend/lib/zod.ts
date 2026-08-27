@@ -1,15 +1,5 @@
 import * as z from 'zod'
 
-export const User = z.object({
-    email: z.email({ error: 'Please enter a valid email address.' }),
-    password: z.string().min(8, { error: 'Password must be at least 8 characters.' })
-})
-
-export const UpdatePassword = z.object({
-    oldPassword: z.string().min(1, { error: 'Please enter your current password.' }),
-    newPassword: z.string().min(8, { error: 'New password must be at least 8 characters.' })
-})
-
 export const Preferences = z.object({
     genres: z
         .array(z.string().max(50, { error: 'Genre names must be 50 characters or less.' }))

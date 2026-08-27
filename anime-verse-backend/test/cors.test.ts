@@ -54,7 +54,7 @@ describe('GET /api-docs', () => {
     // publishing an empty or incomplete spec while the build stays green.
     it('generates a spec covering every route', () => {
         const { paths } = openapiSpec as { paths: Record<string, unknown> }
-        expect(Object.keys(paths)).toHaveLength(17)
+        expect(Object.keys(paths)).toHaveLength(15)
         expect(paths).toHaveProperty(['/health', 'get'])
     })
 })

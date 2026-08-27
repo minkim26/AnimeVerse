@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import prisma from '../lib/prisma.ts'
+import { Prisma } from '../generated/prisma/client.ts'
 import { checkJwt, requireAuth, EMAIL_CLAIM, EMAIL_VERIFIED_CLAIM, type AuthenticatedRequest } from '../lib/auth.ts'
 import { getJSON, setJSON, userCacheKey, withoutAuth0Id, USER_CACHE_TTL_SECONDS } from '../lib/cache.ts'
 
@@ -61,8 +62,24 @@ router.post('/sync', checkJwt, async (req: AuthenticatedRequest, res) => {
         }
     }
 
-    const user = await prisma.user.create({ data: { auth0Id: sub, email } })
-    res.status(201).send(withoutAuth0Id(user))
+    try {
+        const user = await prisma.user.create({ data: { auth0Id: sub, email } })
+        res.status(201).send(withoutAuth0Id(user))
+    } catch (err) {
+        // Two concurrent first-syncs for the same identity (e.g. two tabs)
+        // both pass the findUnique check above, then race here — one
+        // create() wins, the other hits auth0Id's unique constraint. That's
+        // not a real failure, just a late arrival: return the row the
+        // other request already created instead of surfacing a 400 that
+        // would send the frontend into an unwarranted logout.
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+            const raced = await prisma.user.findUnique({ where: { auth0Id: sub } })
+            if (raced) {
+                return res.status(200).send(withoutAuth0Id(raced))
+            }
+        }
+        throw err
+    }
 })
 
 /*

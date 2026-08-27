@@ -8,7 +8,7 @@ generator client {
 }
 
 // User model — stores registered application users.
-// Passwords are stored as bcrypt hashes — never plain text.
+// Auth handled entirely by Auth0; no password is stored here.
 model User {
     id                 Int             @id @default(autoincrement())
     auth0Id            String?         @unique

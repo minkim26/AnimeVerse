@@ -15,7 +15,8 @@ export default function Login() {
 
   function handleLogin() {
     const from = (location.state as { from?: Location } | null)?.from
-    loginWithRedirect({ appState: { returnTo: from?.pathname ?? '/profile' } })
+    const returnTo = from ? `${from.pathname}${from.search}${from.hash}` : '/profile'
+    loginWithRedirect({ appState: { returnTo } })
   }
 
   return (

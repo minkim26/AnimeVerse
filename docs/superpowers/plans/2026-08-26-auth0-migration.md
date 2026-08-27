@@ -1369,7 +1369,7 @@ async function main() {
     const importFormat = users.map((user) => ({
         email: user.email,
         email_verified: true,
-        custom_password_hash: { algorithm: 'bcrypt', hash: user.password }
+        custom_password_hash: { algorithm: 'bcrypt', hash: { value: user.password, encoding: 'utf8' } }
     }))
 
     console.log(JSON.stringify(importFormat, null, 2))

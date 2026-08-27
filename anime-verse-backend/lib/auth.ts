@@ -11,12 +11,16 @@ export const EMAIL_VERIFIED_CLAIM = 'https://animeverse.app/email_verified'
  * RS256-via-JWKS to a locally-verifiable HS256 shared secret, so tests
  * (test/helpers.ts) can mint real, validly-signed tokens with no network
  * call to a real Auth0 tenant. Guarded so it can never accidentally take
- * over in production — anyone holding this value could forge a token for
- * any user if it did.
+ * over outside the test runner — anyone holding this value could forge a
+ * token for any user if it did. Checked against NODE_ENV === 'test'
+ * (Vitest's own default, never set explicitly anywhere in this repo)
+ * rather than NODE_ENV === 'production', since neither Dockerfile nor
+ * compose.prod.yml ever sets NODE_ENV — a production-only check would
+ * silently never fire.
  */
 const testSigningSecret = process.env.AUTH0_TEST_SIGNING_SECRET
-if (testSigningSecret && process.env.NODE_ENV === 'production') {
-    throw new Error('AUTH0_TEST_SIGNING_SECRET must not be set in production')
+if (testSigningSecret && process.env.NODE_ENV !== 'test') {
+    throw new Error('AUTH0_TEST_SIGNING_SECRET may only be set when NODE_ENV=test')
 }
 
 /*
